@@ -3,6 +3,7 @@ rtl/dcache_controller.v
 rtl/dcache_datapath.v
 rtl/dcache_perf_counters.v
 rtl/riscv_dcache_2way.v
+rtl/dcache_req_rsp_adapter.v
 rtl/riscv_core_rv32i.v
 rtl/riscv_cache_soc.v
 tb/var_latency_mem.v

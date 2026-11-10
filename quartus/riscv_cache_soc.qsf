@@ -1,0 +1,16 @@
+# =============================================================================
+# Cấu hình Quartus II cho Bo mạch DE10-Standard (Cyclone V SoC: 5CSXFC6D6F31C6)
+# Chạy tổng hợp từ thư mục gốc DATN:
+#   quartus_map --read_settings_files=on --write_settings_files=off quartus/riscv_cache_soc -c riscv_cache_soc
+# =============================================================================
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSXFC6D6F31C6
+set_global_assignment -name TOP_LEVEL_ENTITY riscv_cache_soc
+set_global_assignment -name VERILOG_FILE ../rtl/dcache_perf_counters.v
+set_global_assignment -name VERILOG_FILE ../rtl/dcache_controller.v
+set_global_assignment -name VERILOG_FILE ../rtl/dcache_datapath.v
+set_global_assignment -name VERILOG_FILE ../rtl/riscv_dcache_2way.v
+set_global_assignment -name VERILOG_FILE ../rtl/dcache_req_rsp_adapter.v
+set_global_assignment -name VERILOG_FILE ../rtl/riscv_core_rv32i.v
+set_global_assignment -name VERILOG_FILE ../rtl/riscv_cache_soc.v
+set_global_assignment -name SEARCH_PATH ..
