@@ -1,0 +1,387 @@
+`timescale 1ns / 1ps
+
+module riscv_dcache_2way #(
+    parameter ADDR_WIDTH     = 32,
+    parameter DATA_WIDTH     = 32,
+    parameter NUM_SETS       = 64,              // S = 64 sets (s = 6 bits)
+    parameter WAYS           = 2,               // E = 2 ways (2-way set-associative)
+    parameter WORDS_PER_LINE = 4                // B = 16 bytes = 4 words (b = 4 bits)
+)(
+    input  wire                   clk,
+    input  wire                   rst_n,
+
+    // --- Giao tiếp phía Lõi RISC-V (CPU Load/Store Unit Interface) ---
+    input  wire                   cpu_req,      // Yêu cầu đọc/ghi từ CPU
+    input  wire                   cpu_we,       // 0: Load (Read), 1: Store (Write)
+    input  wire [3:0]             cpu_wstrb,    // Byte enable (hỗ trợ SB, SH, SW)
+    input  wire [ADDR_WIDTH-1:0]  cpu_addr,     // Địa chỉ 32-bit
+    input  wire [DATA_WIDTH-1:0]  cpu_wdata,    // Dữ liệu ghi từ CPU
+    output reg  [DATA_WIDTH-1:0]  cpu_rdata,    // Dữ liệu đọc trả về CPU
+    output wire                   cpu_stall,    // Giữ pipeline CPU khi Cache bận
+    output reg                    cpu_ready,    // Báo hoàn tất giao dịch trong chu kỳ hiện tại
+
+    // --- Giao tiếp Điều khiển Nhất quán Dữ liệu (Dành cho ĐATN: CPU-DMA) ---
+    input  wire                   cache_flush,      // Đẩy toàn bộ dòng Dirty xuống RAM
+    input  wire                   cache_invalidate, // Xóa Valid toàn bộ Cache
+    output reg                    maint_done,       // Báo hoàn tất Flush/Invalidate
+
+    // --- Giao tiếp phía Bộ nhớ chính (Memory / Bus Interface) ---
+    output reg                    mem_req,
+    output reg                    mem_we,
+    output reg  [ADDR_WIDTH-1:0]  mem_addr,
+    output reg  [DATA_WIDTH-1:0]  mem_wdata,
+    input  wire [DATA_WIDTH-1:0]  mem_rdata,
+    input  wire                   mem_ready,
+
+    // --- Các Bộ đếm Đánh giá Hiệu năng (Performance Counters) ---
+    output reg  [31:0]            cnt_accesses,     // Tổng số lần CPU truy cập Cache
+    output reg  [31:0]            cnt_misses,       // Tổng số lần Cache Miss
+    output reg  [31:0]            cnt_stall_cycles, // Tổng số chu kỳ dừng CPU
+    output reg  [31:0]            cnt_mem_traffic,  // Tổng số word truyền qua bus bộ nhớ
+    output reg  [31:0]            cnt_coherence_cyc // Overhead chu kỳ Flush/Invalidate
+);
+
+    // Phân rã địa chỉ: [31:10] Tag (22b) | [9:4] Set Index (6b) | [3:2] Word Offset (2b) | [1:0] Byte Offset (2b)
+    localparam OFFSET_BITS = 4;                         // 16 bytes/line
+    localparam WORD_BITS   = 2;                         // 4 words/line
+    localparam INDEX_BITS  = 6;                         // 64 sets
+    localparam TAG_BITS    = ADDR_WIDTH - INDEX_BITS - OFFSET_BITS; // 22 bits
+
+    wire [TAG_BITS-1:0]   req_tag    = cpu_addr[ADDR_WIDTH-1 : INDEX_BITS+OFFSET_BITS];
+    wire [INDEX_BITS-1:0] req_index  = cpu_addr[INDEX_BITS+OFFSET_BITS-1 : OFFSET_BITS];
+    wire [WORD_BITS-1:0]  req_word   = cpu_addr[OFFSET_BITS-1 : 2];
+    wire                  is_uncached = cpu_addr[31];   // Quy ước bit 31 = 1 là vùng Uncached (MMIO/DMA)
+
+    // --- Mảng Lưu trữ của Cache (Tag, Metadata & Data Arrays) ---
+    reg [TAG_BITS-1:0]   tag_array   [0:NUM_SETS-1][0:WAYS-1];
+    reg [DATA_WIDTH-1:0] data_array  [0:NUM_SETS-1][0:WAYS-1][0:WORDS_PER_LINE-1];
+    reg                  valid_array [0:NUM_SETS-1][0:WAYS-1];
+    reg                  dirty_array [0:NUM_SETS-1][0:WAYS-1];
+    reg                  lru_bit     [0:NUM_SETS-1]; // 0: Way 0 là LRU (cũ hơn), 1: Way 1 là LRU
+
+    // --- Write Buffer (Eviction Buffer chứa 1 dòng 4-word) ---
+    reg                  wb_valid;
+    reg [ADDR_WIDTH-1:0] wb_base_addr;
+    reg [DATA_WIDTH-1:0] wb_data [0:WORDS_PER_LINE-1];
+
+    // --- Logic Kiểm tra Hit/Miss Song song (Parallel Lookup) ---
+    wire hit_way0 = valid_array[req_index][0] && (tag_array[req_index][0] == req_tag) && !is_uncached;
+    wire hit_way1 = valid_array[req_index][1] && (tag_array[req_index][1] == req_tag) && !is_uncached;
+    wire cache_hit = hit_way0 || hit_way1;
+    wire hit_way_sel = hit_way1 ? 1'b1 : 1'b0;
+
+    // Chọn đường thay thế (Victim Way) khi Miss: Ưu tiên way trống (!valid), nếu cả 2 đầy thì chọn theo lru_bit
+    wire victim_way = (!valid_array[req_index][0]) ? 1'b0 :
+                      (!valid_array[req_index][1]) ? 1'b1 :
+                      lru_bit[req_index];
+
+    // --- Máy Trạng thái Hữu hạn (FSM States) ---
+    localparam S_IDLE       = 3'd0;
+    localparam S_REFILL     = 3'd1; // Nạp dòng mới gồm 4 words từ bộ nhớ chính
+    localparam S_WB_DRAIN   = 3'd2; // Đẩy dòng Dirty từ Write Buffer xuống bộ nhớ chính
+    localparam S_UNCACHED   = 3'd3; // Truy cập trực tiếp bỏ qua Cache
+    localparam S_FLUSH      = 3'd4; // Quét và ghi trả toàn bộ dòng Dirty (cho ĐATN)
+
+    reg [2:0] state;
+    reg [1:0] word_cnt;             // Đếm từ (0..3) khi Refill hoặc Write-back
+    reg       saved_victim_way;
+    reg [INDEX_BITS:0] flush_set_cnt;
+    reg                flush_way_cnt;
+
+    // Ghi nhớ yêu cầu bảo trì: xung cache_flush/cache_invalidate có thể đến khi FSM đang bận
+    // (REFILL/WB_DRAIN/UNCACHED). Cờ pending giữ yêu cầu cho tới khi S_IDLE phục vụ.
+    reg                flush_pending;
+    reg                inval_pending;
+    wire               flush_req = cache_flush      || flush_pending;
+    wire               inval_req = cache_invalidate || inval_pending;
+
+    // Hàm hỗ trợ ghi theo Byte Mask (cpu_wstrb)
+    function [DATA_WIDTH-1:0] apply_wstrb(
+        input [DATA_WIDTH-1:0] old_word,
+        input [DATA_WIDTH-1:0] new_word,
+        input [3:0]            wstrb
+    );
+        begin
+            apply_wstrb[7:0]   = wstrb[0] ? new_word[7:0]   : old_word[7:0];
+            apply_wstrb[15:8]  = wstrb[1] ? new_word[15:8]  : old_word[15:8];
+            apply_wstrb[23:16] = wstrb[2] ? new_word[23:16] : old_word[23:16];
+            apply_wstrb[31:24] = wstrb[3] ? new_word[31:24] : old_word[31:24];
+        end
+    endfunction
+
+    // CPU bị dừng (stall) khi có yêu cầu nhưng chưa hoàn tất trong chu kỳ đó, hoặc đang Flush
+    assign cpu_stall = (cpu_req && !cpu_ready) || (state == S_FLUSH);
+
+    integer s, w, k;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            state             <= S_IDLE;
+            word_cnt          <= 2'd0;
+            wb_valid          <= 1'b0;
+            wb_base_addr      <= {ADDR_WIDTH{1'b0}};
+            cpu_rdata         <= {DATA_WIDTH{1'b0}};
+            cpu_ready         <= 1'b0;
+            maint_done        <= 1'b0;
+            mem_req           <= 1'b0;
+            mem_we            <= 1'b0;
+            mem_addr          <= {ADDR_WIDTH{1'b0}};
+            mem_wdata         <= {DATA_WIDTH{1'b0}};
+            saved_victim_way  <= 1'b0;
+            flush_set_cnt     <= 0;
+            flush_way_cnt     <= 1'b0;
+            flush_pending     <= 1'b0;
+            inval_pending     <= 1'b0;
+
+            cnt_accesses      <= 32'd0;
+            cnt_misses        <= 32'd0;
+            cnt_stall_cycles  <= 32'd0;
+            cnt_mem_traffic   <= 32'd0;
+            cnt_coherence_cyc <= 32'd0;
+
+            for (s = 0; s < NUM_SETS; s = s + 1) begin
+                lru_bit[s] <= 1'b0;
+                for (w = 0; w < WAYS; w = w + 1) begin
+                    valid_array[s][w] <= 1'b0;
+                    dirty_array[s][w] <= 1'b0;
+                    tag_array[s][w]   <= {TAG_BITS{1'b0}};
+                    for (k = 0; k < WORDS_PER_LINE; k = k + 1)
+                        data_array[s][w][k] <= {DATA_WIDTH{1'b0}};
+                end
+            end
+        end else begin
+            // Mặc định xóa các cờ báo 1 chu kỳ
+            cpu_ready  <= 1'b0;
+            maint_done <= 1'b0;
+
+            // Chốt yêu cầu bảo trì ở mọi trạng thái (S_IDLE sẽ xóa cờ khi phục vụ)
+            if (cache_flush)      flush_pending <= 1'b1;
+            if (cache_invalidate) inval_pending <= 1'b1;
+
+            // Đếm chu kỳ dừng (Stall cycles)
+            if (cpu_stall)
+                cnt_stall_cycles <= cnt_stall_cycles + 1'b1;
+
+            case (state)
+                // =============================================================
+                // TRẠNG THÁI IDLE: Kiểm tra Hit/Miss và Phục vụ ngay nếu Hit
+                // =============================================================
+                S_IDLE: begin
+                    // 1. Ưu tiên xử lý lệnh Invalidate / Flush (Hợp đồng phần mềm ĐATN)
+                    if (inval_req) begin
+                        inval_pending     <= 1'b0;
+                        for (s = 0; s < NUM_SETS; s = s + 1) begin
+                            valid_array[s][0] <= 1'b0;
+                            valid_array[s][1] <= 1'b0;
+                            dirty_array[s][0] <= 1'b0;
+                            dirty_array[s][1] <= 1'b0;
+                        end
+                        maint_done        <= 1'b1;
+                        cnt_coherence_cyc <= cnt_coherence_cyc + 1'b1;
+                    end else if (flush_req && !wb_valid) begin
+                        // Chờ Write Buffer xả xong để không bỏ sót dòng Dirty đang nằm trong WB
+                        flush_pending     <= 1'b0;
+                        flush_set_cnt     <= 0;
+                        flush_way_cnt     <= 1'b0;
+                        word_cnt          <= 2'd0;
+                        state             <= S_FLUSH;
+                        cnt_coherence_cyc <= cnt_coherence_cyc + 1'b1;
+                    end
+                    // 2. Xử lý yêu cầu Đọc/Ghi từ CPU
+                    else if (cpu_req && !cpu_ready) begin
+                        if (is_uncached) begin
+                            // Truy cập vùng nhớ Uncached (Bypass)
+                            state     <= S_UNCACHED;
+                            mem_req   <= 1'b1;
+                            mem_we    <= cpu_we;
+                            mem_addr  <= {cpu_addr[31:2], 2'b00};
+                            mem_wdata <= cpu_wdata;
+                        end else if (cache_hit) begin
+                            // --- CACHE HIT (Hoàn thành trong 1 chu kỳ) ---
+                            cnt_accesses <= cnt_accesses + 1'b1;
+                            cpu_ready    <= 1'b1;
+                            // Cập nhật LRU: nếu trúng Way 0 thì Way 1 thành LRU (1), ngược lại Way 0 thành LRU (0)
+                            lru_bit[req_index] <= ~hit_way_sel;
+
+                            if (cpu_we) begin
+                                // Write-Hit (Chính sách Write-Back: ghi vào Cache và bật cờ Dirty)
+                                data_array[req_index][hit_way_sel][req_word] <= apply_wstrb(
+                                    data_array[req_index][hit_way_sel][req_word],
+                                    cpu_wdata,
+                                    cpu_wstrb
+                                );
+                                dirty_array[req_index][hit_way_sel] <= 1'b1;
+                            end else begin
+                                // Read-Hit
+                                cpu_rdata <= data_array[req_index][hit_way_sel][req_word];
+                            end
+                        end else begin
+                            // --- CACHE MISS ---
+                            cnt_accesses     <= cnt_accesses + 1'b1;
+                            cnt_misses       <= cnt_misses + 1'b1;
+                            saved_victim_way <= victim_way;
+                            word_cnt         <= 2'd0;
+
+                            // Nếu dòng bị thay thế đang Dirty, đẩy nó vào Write Buffer trước
+                            if (valid_array[req_index][victim_way] && dirty_array[req_index][victim_way]) begin
+                                wb_valid     <= 1'b1;
+                                wb_base_addr <= {tag_array[req_index][victim_way], req_index, {OFFSET_BITS{1'b0}}};
+                                for (k = 0; k < WORDS_PER_LINE; k = k + 1)
+                                    wb_data[k] <= data_array[req_index][victim_way][k];
+                                dirty_array[req_index][victim_way] <= 1'b0;
+                            end
+
+                            // Bắt đầu Refill dòng mới từ bộ nhớ chính (Ưu tiên Read-Miss/Write-Allocate trước)
+                            state    <= S_REFILL;
+                            mem_req  <= 1'b1;
+                            mem_we   <= 1'b0;
+                            mem_addr <= {req_tag, req_index, 4'b0000};
+                        end
+                    end
+                    // 3. Nếu CPU rảnh và Write Buffer đang có dữ liệu bẩn, tranh thủ xả xuống RAM
+                    else if (wb_valid) begin
+                        state     <= S_WB_DRAIN;
+                        word_cnt  <= 2'd0;
+                        mem_req   <= 1'b1;
+                        mem_we    <= 1'b1;
+                        mem_addr  <= wb_base_addr;
+                        mem_wdata <= wb_data[0];
+                    end
+                end
+
+                // =============================================================
+                // TRẠNG THÁI REFILL: Nạp 4 words của dòng mới từ RAM vào Cache
+                // =============================================================
+                S_REFILL: begin
+                    if (mem_ready) begin
+                        cnt_mem_traffic <= cnt_mem_traffic + 1'b1;
+                        data_array[req_index][saved_victim_way][word_cnt] <= mem_rdata;
+
+                        if (word_cnt == WORDS_PER_LINE - 1) begin
+                            // Đã nạp đủ cả dòng Cache
+                            mem_req <= 1'b0;
+                            valid_array[req_index][saved_victim_way] <= 1'b1;
+                            tag_array[req_index][saved_victim_way]   <= req_tag;
+                            lru_bit[req_index]                       <= ~saved_victim_way;
+
+                            // Thực hiện ngay thao tác của CPU (Write-Allocate hoặc Read)
+                            if (cpu_we) begin
+                                data_array[req_index][saved_victim_way][req_word] <= apply_wstrb(
+                                    (req_word == 2'd3) ? mem_rdata : data_array[req_index][saved_victim_way][req_word],
+                                    cpu_wdata,
+                                    cpu_wstrb
+                                );
+                                dirty_array[req_index][saved_victim_way] <= 1'b1;
+                            end else begin
+                                cpu_rdata <= (req_word == 2'd3) ? mem_rdata : data_array[req_index][saved_victim_way][req_word];
+                                dirty_array[req_index][saved_victim_way] <= 1'b0;
+                            end
+
+                            cpu_ready <= 1'b1;
+
+                            // Nếu có dòng Dirty nằm trong Write Buffer thì chuyển sang xả xuống RAM
+                            if (wb_valid) begin
+                                state     <= S_WB_DRAIN;
+                                word_cnt  <= 2'd0;
+                                mem_req   <= 1'b1;
+                                mem_we    <= 1'b1;
+                                mem_addr  <= wb_base_addr;
+                                mem_wdata <= wb_data[0];
+                            end else begin
+                                state <= S_IDLE;
+                            end
+                        end else begin
+                            word_cnt <= word_cnt + 1'b1;
+                            mem_addr <= {req_tag, req_index, word_cnt + 2'd1, 2'b00};
+                        end
+                    end
+                end
+
+                // =============================================================
+                // TRẠNG THÁI WB_DRAIN: Xả Write Buffer (4 words) xuống RAM
+                // =============================================================
+                S_WB_DRAIN: begin
+                    if (mem_ready) begin
+                        cnt_mem_traffic <= cnt_mem_traffic + 1'b1;
+                        if (word_cnt == WORDS_PER_LINE - 1) begin
+                            mem_req  <= 1'b0;
+                            mem_we   <= 1'b0;
+                            wb_valid <= 1'b0;
+                            state    <= S_IDLE;
+                        end else begin
+                            word_cnt  <= word_cnt + 1'b1;
+                            mem_addr  <= wb_base_addr + ((word_cnt + 2'd1) << 2);
+                            mem_wdata <= wb_data[word_cnt + 1'b1];
+                        end
+                    end
+                end
+
+                // =============================================================
+                // TRẠNG THÁI UNCACHED: Đọc/ghi trực tiếp không qua Cache
+                // =============================================================
+                S_UNCACHED: begin
+                    if (mem_ready) begin
+                        cnt_mem_traffic <= cnt_mem_traffic + 1'b1;
+                        mem_req         <= 1'b0;
+                        mem_we          <= 1'b0;
+                        cpu_rdata       <= mem_rdata;
+                        cpu_ready       <= 1'b1;
+                        state           <= S_IDLE;
+                    end
+                end
+
+                // =============================================================
+                // TRẠNG THÁI FLUSH: Quét và đẩy mọi dòng Dirty xuống RAM (ĐATN)
+                // =============================================================
+                S_FLUSH: begin
+                    cnt_coherence_cyc <= cnt_coherence_cyc + 1'b1;
+                    if (flush_set_cnt < NUM_SETS) begin
+                        if (valid_array[flush_set_cnt[INDEX_BITS-1:0]][flush_way_cnt] &&
+                            dirty_array[flush_set_cnt[INDEX_BITS-1:0]][flush_way_cnt]) begin
+                            if (!mem_req) begin
+                                mem_req   <= 1'b1;
+                                mem_we    <= 1'b1;
+                                mem_addr  <= {tag_array[flush_set_cnt[INDEX_BITS-1:0]][flush_way_cnt],
+                                              flush_set_cnt[INDEX_BITS-1:0], word_cnt, 2'b00};
+                                mem_wdata <= data_array[flush_set_cnt[INDEX_BITS-1:0]][flush_way_cnt][word_cnt];
+                            end else if (mem_ready) begin
+                                cnt_mem_traffic <= cnt_mem_traffic + 1'b1;
+                                if (word_cnt == WORDS_PER_LINE - 1) begin
+                                    mem_req <= 1'b0;
+                                    mem_we  <= 1'b0;
+                                    dirty_array[flush_set_cnt[INDEX_BITS-1:0]][flush_way_cnt] <= 1'b0;
+                                    word_cnt <= 2'd0;
+                                    if (flush_way_cnt == 1'b1) begin
+                                        flush_way_cnt <= 1'b0;
+                                        flush_set_cnt <= flush_set_cnt + 1'b1;
+                                    end else begin
+                                        flush_way_cnt <= 1'b1;
+                                    end
+                                end else begin
+                                    word_cnt  <= word_cnt + 1'b1;
+                                    mem_addr  <= {tag_array[flush_set_cnt[INDEX_BITS-1:0]][flush_way_cnt],
+                                                  flush_set_cnt[INDEX_BITS-1:0], word_cnt + 2'd1, 2'b00};
+                                    mem_wdata <= data_array[flush_set_cnt[INDEX_BITS-1:0]][flush_way_cnt][word_cnt + 1'b1];
+                                end
+                            end
+                        end else begin
+                            // Dòng hiện tại không Dirty, chuyển sang dòng kế tiếp
+                            if (flush_way_cnt == 1'b1) begin
+                                flush_way_cnt <= 1'b0;
+                                flush_set_cnt <= flush_set_cnt + 1'b1;
+                            end else begin
+                                flush_way_cnt <= 1'b1;
+                            end
+                        end
+                    end else begin
+                        maint_done <= 1'b1;
+                        state      <= S_IDLE;
+                    end
+                end
+
+                default: state <= S_IDLE;
+            endcase
+        end
+    end
+
+endmodule

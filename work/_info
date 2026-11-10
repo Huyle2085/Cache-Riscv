@@ -1,0 +1,380 @@
+m255
+K3
+13
+cModel Technology
+Z0 dC:\Users\HUY\Desktop\DATN
+vdcache_controller
+Z1 I]O5TL8CbB5n5aK2EZbcRf1
+Z2 VXYT0=S>SVP^;dg=H]BiIh1
+Z3 dC:\Users\HUY\Desktop\DATN
+Z4 w1794327072
+Z5 8rtl/dcache_controller.v
+Z6 Frtl/dcache_controller.v
+L0 10
+Z7 OV;L;10.1d;51
+r1
+31
+Z8 !s108 1794327533.860000
+Z9 !s107 tb/tb_riscv_cache_soc.v|tb/tb_riscv_dcache_2way.v|tb/var_latency_mem.v|rtl/riscv_cache_soc.v|rtl/riscv_core_rv32i.v|rtl/riscv_dcache_2way.v|rtl/dcache_perf_counters.v|rtl/dcache_datapath.v|rtl/dcache_controller.v|
+Z10 !s90 rtl/dcache_controller.v|rtl/dcache_datapath.v|rtl/dcache_perf_counters.v|rtl/riscv_dcache_2way.v|rtl/riscv_core_rv32i.v|rtl/riscv_cache_soc.v|tb/var_latency_mem.v|tb/tb_riscv_dcache_2way.v|tb/tb_riscv_cache_soc.v|
+o-O0
+Z11 !s100 =k:fzcM@3E8[`ikAfkTWB0
+!i10b 1
+!s85 0
+!s101 -O0
+vdcache_datapath
+Z12 Im3?mjXb8RNJl^=omhHf4C1
+Z13 Vl>ONUMfH7hNNU4UXniX`F3
+R3
+Z14 w1794327129
+Z15 8rtl/dcache_datapath.v
+Z16 Frtl/dcache_datapath.v
+L0 10
+R7
+r1
+31
+R8
+R9
+R10
+o-O0
+Z17 !s100 ;U@o0Y>Ilacb>jVW4dRTY3
+!i10b 1
+!s85 0
+!s101 -O0
+vdcache_min_controller
+Z18 !s100 9OI?gaM:d3X78j@PUMkfc3
+Z19 IDGVY59>89ni]L=3a6Rckn2
+Z20 VGUa`cFL`ZRWT]eQifRcD_0
+R3
+Z21 w1793026718
+Z22 8minimal/dcache_min_controller.v
+Z23 Fminimal/dcache_min_controller.v
+L0 18
+R7
+r1
+31
+Z24 !s108 1793118603.625000
+Z25 !s107 minimal/tb/tc3_thrashing.vh|minimal/tb/tc2_writeback.vh|minimal/tb/tc1_hit_miss.vh|minimal/tb/tb_min_tasks.vh|minimal/tb/tb_min_base.vh|minimal/tb_dcache_minimal.v|tb/var_latency_mem.v|minimal/dcache_minimal.v|minimal/dcache_min_perf_counters.v|minimal/dcache_min_datapath.v|minimal/dcache_min_controller.v|
+Z26 !s90 minimal/dcache_min_controller.v|minimal/dcache_min_datapath.v|minimal/dcache_min_perf_counters.v|minimal/dcache_minimal.v|tb/var_latency_mem.v|minimal/tb_dcache_minimal.v|
+o-O0
+!i10b 1
+!s85 0
+!s101 -O0
+vdcache_min_datapath
+Z27 !s100 zkcezUBaWCl_QkKGQhane2
+Z28 I_=d;X18<f[IjMEeON92@62
+Z29 VGF@3fkc4OW5]kAhlN[BUj3
+R3
+Z30 w1793026744
+Z31 8minimal/dcache_min_datapath.v
+Z32 Fminimal/dcache_min_datapath.v
+L0 18
+R7
+r1
+31
+R24
+R25
+R26
+o-O0
+!i10b 1
+!s85 0
+!s101 -O0
+vdcache_min_perf_counters
+Z33 !s100 2SibJZLWJ09`NzU_^4o:j0
+Z34 I7`TndOVTI<S3Z<4;0ESn;3
+Z35 V?gKi98CcKS]QlcUZOK_J41
+R3
+Z36 w1793026761
+Z37 8minimal/dcache_min_perf_counters.v
+Z38 Fminimal/dcache_min_perf_counters.v
+L0 12
+R7
+r1
+31
+R24
+R25
+R26
+o-O0
+!i10b 1
+!s85 0
+!s101 -O0
+vdcache_minimal
+Z39 !s100 ;<DACa_b5mFC:z`kP8?Vl0
+Z40 IT9F2c0?1k1Sk6i_nNQCS42
+Z41 VDQgm=k3<Pd9YEN7j`n_810
+R3
+Z42 w1793026791
+Z43 8minimal/dcache_minimal.v
+Z44 Fminimal/dcache_minimal.v
+L0 18
+R7
+r1
+31
+R24
+R25
+R26
+o-O0
+!i10b 1
+!s85 0
+!s101 -O0
+vdcache_perf_counters
+Z45 !s100 13WEG61KGQK=jog;Uc<<:3
+Z46 IGWn3g44Lb=2<Nc4R>S:BN3
+Z47 VTNMD53Fk<?bBHo=Ph0WmK0
+R3
+Z48 w1792075370
+Z49 8rtl/dcache_perf_counters.v
+Z50 Frtl/dcache_perf_counters.v
+L0 7
+R7
+r1
+31
+R8
+R9
+R10
+o-O0
+!i10b 1
+!s85 0
+!s101 -O0
+vdump_wave
+Z51 !s100 Q]PIjF5:o4@DZRhJLjU012
+Z52 I2YVgmM=?dGXHUJ1P]ac[L0
+Z53 V7<QAUk1TcFE`da:`Kz4TF2
+R3
+Z54 w1792074270
+Z55 8sim/dump_wave.v
+Z56 Fsim/dump_wave.v
+L0 3
+R7
+r1
+31
+Z57 !s108 1792132807.605000
+Z58 !s107 sim/dump_wave.v|tb/tb_riscv_dcache_2way.v|tb/var_latency_mem.v|rtl/riscv_dcache_2way.v|rtl/dcache_perf_counters.v|rtl/dcache_datapath.v|rtl/dcache_controller.v|
+Z59 !s90 -f|sim/files.f|
+o-O0
+!i10b 1
+!s85 0
+!s101 -O0
+vriscv_cache_soc
+Z60 IA7Q?<FEMSU94BMGC2jijE0
+Z61 VX<aFg_ieM6:X6gGJ1URPb1
+R3
+Z62 w1794327171
+Z63 8rtl/riscv_cache_soc.v
+Z64 Frtl/riscv_cache_soc.v
+L0 11
+R7
+r1
+31
+R8
+R9
+R10
+o-O0
+Z65 !s100 fKo>mclJiDfXko`J6@z1S0
+!i10b 1
+!s85 0
+!s101 -O0
+vriscv_core_rv32i
+Z66 !s100 oHk4NE0Te=oPi<No?OJVS3
+Z67 IBE?8VXR3maLSDOCInn9=?3
+Z68 V9YK2=ZnX=^EBaJ7RMEdbL3
+R3
+Z69 w1792136715
+Z70 8rtl/riscv_core_rv32i.v
+Z71 Frtl/riscv_core_rv32i.v
+L0 23
+R7
+r1
+31
+R8
+R9
+R10
+o-O0
+!i10b 1
+!s85 0
+!s101 -O0
+vriscv_dcache_2way
+Z72 IJ>E4mmWooFc9Iih;cQQ8_1
+Z73 V5[:bDkjCQd]4lhOGcgZFM2
+R3
+Z74 w1794327168
+Z75 8rtl/riscv_dcache_2way.v
+Z76 Frtl/riscv_dcache_2way.v
+L0 15
+R7
+r1
+31
+R8
+R9
+R10
+o-O0
+Z77 !s100 =@ed<U9fLNoM<JSSmE[Oc2
+!i10b 1
+!s85 0
+!s101 -O0
+vtb_compare_models
+Z78 !s100 :WMjU:@7jcX?GK[f5iP1?2
+Z79 IfcjIC?WN>8VS<km_jQQ;[0
+Z80 V;fSe5lBYUTE]_:YzUNFKd2
+R3
+Z81 w1793030773
+Z82 8minimal/tb_compare_models.v
+Z83 Fminimal/tb_compare_models.v
+L0 13
+R7
+r1
+31
+Z84 !s108 1793114975.188000
+Z85 !s107 minimal/tb_compare_models.v|tb/var_latency_mem.v|rtl/riscv_dcache_2way.v|rtl/dcache_perf_counters.v|rtl/dcache_datapath.v|rtl/dcache_controller.v|minimal/dcache_minimal.v|minimal/dcache_min_perf_counters.v|minimal/dcache_min_datapath.v|minimal/dcache_min_controller.v|
+Z86 !s90 minimal/dcache_min_controller.v|minimal/dcache_min_datapath.v|minimal/dcache_min_perf_counters.v|minimal/dcache_minimal.v|rtl/dcache_controller.v|rtl/dcache_datapath.v|rtl/dcache_perf_counters.v|rtl/riscv_dcache_2way.v|tb/var_latency_mem.v|minimal/tb_compare_models.v|
+o-O0
+!i10b 1
+!s85 0
+!s101 -O0
+vtb_dcache_minimal
+Z87 !s100 R8h_S];27X7m;?I?_ZKS?3
+Z88 Il>Gk@IgSln>XQK3=Yce1i1
+Z89 V[[bdBZo`MUMPJW5madElR3
+R3
+Z90 w1793115219
+Z91 8minimal/tb_dcache_minimal.v
+Z92 Fminimal/tb_dcache_minimal.v
+Z93 Fminimal/tb/tb_min_base.vh
+Z94 Fminimal/tb/tb_min_tasks.vh
+Z95 Fminimal/tb/tc1_hit_miss.vh
+Z96 Fminimal/tb/tc2_writeback.vh
+Z97 Fminimal/tb/tc3_thrashing.vh
+L0 15
+R7
+r1
+31
+R24
+R25
+R26
+o-O0
+!i10b 1
+!s85 0
+!s101 -O0
+vtb_riscv_cache_soc
+!i10b 1
+!s100 KMSNI<iBYa[D`@3F3oHHS0
+InTHJ;_lNjST2O28Kj?NLb0
+Z98 VDC8<f^3QW<U:kJ0gglCV]1
+R3
+w1794328602
+Z99 8tb/tb_riscv_cache_soc.v
+Z100 Ftb/tb_riscv_cache_soc.v
+L0 15
+R7
+r1
+!s85 0
+31
+Z101 !s108 1794328678.843000
+Z102 !s107 tb/tb_riscv_cache_soc.v|tb/tb_riscv_dcache_2way.v|tb/var_latency_mem.v|
+Z103 !s90 tb/var_latency_mem.v|tb/tb_riscv_dcache_2way.v|tb/tb_riscv_cache_soc.v|
+!s101 -O0
+o-O0
+vtb_riscv_dcache_2way
+!i10b 1
+!s100 Q:OCe;cF>8V9Q362z020e1
+I0R]kQkDT=Lo@DR`DhElZf2
+Z104 V`U?9DXkPB@1<522:LE7AB1
+R3
+w1794328541
+Z105 8tb/tb_riscv_dcache_2way.v
+Z106 Ftb/tb_riscv_dcache_2way.v
+L0 3
+R7
+r1
+!s85 0
+31
+R101
+R102
+R103
+!s101 -O0
+o-O0
+vtb_tc1_hit_miss
+Z107 !s100 V;oaPF2ngZ2FggaNdeY7[1
+Z108 IV=U;zF]STMmZK8PKlZS7M2
+Z109 VWgZ=]:G`>24Y@JB<Gg<Ni1
+R3
+Z110 w1793115213
+Z111 8minimal/tb/tb_tc1_hit_miss.v
+Z112 Fminimal/tb/tb_tc1_hit_miss.v
+R93
+R94
+R95
+L0 7
+R7
+r1
+31
+Z113 !s108 1793118582.822000
+Z114 !s107 minimal/tb/tc1_hit_miss.vh|minimal/tb/tb_min_tasks.vh|minimal/tb/tb_min_base.vh|minimal/tb/tb_tc1_hit_miss.v|tb/var_latency_mem.v|minimal/dcache_minimal.v|minimal/dcache_min_perf_counters.v|minimal/dcache_min_datapath.v|minimal/dcache_min_controller.v|
+Z115 !s90 minimal/dcache_min_controller.v|minimal/dcache_min_datapath.v|minimal/dcache_min_perf_counters.v|minimal/dcache_minimal.v|tb/var_latency_mem.v|minimal/tb/tb_tc1_hit_miss.v|
+o-O0
+!i10b 1
+!s85 0
+!s101 -O0
+vtb_tc2_writeback
+Z116 I1zWIEi3Zk@:1[c>Y7PiR53
+Z117 VV;5SHn=bbTBfPzMCiGYLN3
+R3
+Z118 w1793115214
+Z119 8minimal/tb/tb_tc2_writeback.v
+Z120 Fminimal/tb/tb_tc2_writeback.v
+R93
+R94
+R96
+L0 7
+R7
+r1
+31
+Z121 !s108 1793115270.144000
+Z122 !s107 minimal/tb/tc2_writeback.vh|minimal/tb/tb_min_tasks.vh|minimal/tb/tb_min_base.vh|minimal/tb/tb_tc2_writeback.v|tb/var_latency_mem.v|minimal/dcache_minimal.v|minimal/dcache_min_perf_counters.v|minimal/dcache_min_datapath.v|minimal/dcache_min_controller.v|
+Z123 !s90 minimal/dcache_min_controller.v|minimal/dcache_min_datapath.v|minimal/dcache_min_perf_counters.v|minimal/dcache_minimal.v|tb/var_latency_mem.v|minimal/tb/tb_tc2_writeback.v|
+o-O0
+Z124 !s100 CB@?Leo0mbXWgXEYGeG2F3
+!i10b 1
+!s85 0
+!s101 -O0
+vtb_tc3_thrashing
+Z125 !s100 0cfb[4dRNa[:nQ96I=8[?2
+Z126 ISHF_1RP@_42Zjfg:c2V?K1
+Z127 V@YK]DDo7nmYJVNXDoJ78?2
+R3
+Z128 w1793115217
+Z129 8minimal/tb/tb_tc3_thrashing.v
+Z130 Fminimal/tb/tb_tc3_thrashing.v
+R93
+R94
+R97
+L0 7
+R7
+r1
+31
+Z131 !s108 1793118591.049000
+Z132 !s107 minimal/tb/tc3_thrashing.vh|minimal/tb/tb_min_tasks.vh|minimal/tb/tb_min_base.vh|minimal/tb/tb_tc3_thrashing.v|tb/var_latency_mem.v|minimal/dcache_minimal.v|minimal/dcache_min_perf_counters.v|minimal/dcache_min_datapath.v|minimal/dcache_min_controller.v|
+Z133 !s90 minimal/dcache_min_controller.v|minimal/dcache_min_datapath.v|minimal/dcache_min_perf_counters.v|minimal/dcache_minimal.v|tb/var_latency_mem.v|minimal/tb/tb_tc3_thrashing.v|
+o-O0
+!i10b 1
+!s85 0
+!s101 -O0
+vvar_latency_mem
+!i10b 1
+!s100 4nDgXIRf:TkPVH@[c4<g`2
+IleIJZnGLIZ=kBzVWK`amH1
+Z134 V46IHHi]ziNFDbEiX]>X@Y2
+R3
+w1794328533
+Z135 8tb/var_latency_mem.v
+Z136 Ftb/var_latency_mem.v
+L0 10
+R7
+r1
+!s85 0
+31
+R101
+R102
+R103
+!s101 -O0
+o-O0

@@ -1,0 +1,59 @@
+library verilog;
+use verilog.vl_types.all;
+entity dcache_controller is
+    generic(
+        NUM_SETS        : integer := 64;
+        WAYS            : integer := 2;
+        WORDS_PER_LINE  : integer := 4;
+        INDEX_BITS      : integer := 6
+    );
+    port(
+        clk             : in     vl_logic;
+        rst_n           : in     vl_logic;
+        cpu_req         : in     vl_logic;
+        cpu_we          : in     vl_logic;
+        cpu_ready       : out    vl_logic;
+        cpu_stall       : out    vl_logic;
+        cache_flush     : in     vl_logic;
+        cache_invalidate: in     vl_logic;
+        maint_done      : out    vl_logic;
+        mem_req         : out    vl_logic;
+        mem_we          : out    vl_logic;
+        mem_ready       : in     vl_logic;
+        is_uncached     : in     vl_logic;
+        cache_hit       : in     vl_logic;
+        victim_way      : in     vl_logic;
+        victim_dirty    : in     vl_logic;
+        wb_valid        : in     vl_logic;
+        flush_line_dirty: in     vl_logic;
+        word_cnt        : out    vl_logic_vector(1 downto 0);
+        saved_victim_way: out    vl_logic;
+        flush_set       : out    vl_logic_vector;
+        flush_way       : out    vl_logic;
+        dp_req_latch    : out    vl_logic;
+        dp_use_latched  : out    vl_logic;
+        dp_inval_all    : out    vl_logic;
+        dp_hit_rd       : out    vl_logic;
+        dp_hit_wr       : out    vl_logic;
+        dp_wb_load      : out    vl_logic;
+        dp_wb_clear     : out    vl_logic;
+        dp_refill_we    : out    vl_logic;
+        dp_refill_done  : out    vl_logic;
+        dp_unc_rdata    : out    vl_logic;
+        dp_flush_clean  : out    vl_logic;
+        dp_mem_ld       : out    vl_logic;
+        dp_mem_sel      : out    vl_logic_vector(1 downto 0);
+        dp_mem_word     : out    vl_logic_vector(1 downto 0);
+        ev_access       : out    vl_logic;
+        ev_miss         : out    vl_logic;
+        ev_stall        : out    vl_logic;
+        ev_mem_xfer     : out    vl_logic;
+        ev_coherence    : out    vl_logic;
+        state           : out    vl_logic_vector(2 downto 0)
+    );
+    attribute mti_svvh_generic_type : integer;
+    attribute mti_svvh_generic_type of NUM_SETS : constant is 1;
+    attribute mti_svvh_generic_type of WAYS : constant is 1;
+    attribute mti_svvh_generic_type of WORDS_PER_LINE : constant is 1;
+    attribute mti_svvh_generic_type of INDEX_BITS : constant is 1;
+end dcache_controller;

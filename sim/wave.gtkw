@@ -1,0 +1,99 @@
+[timestart] 0
+*-12.000000 1425000
+@200
+-================ TOP: CPU INTERFACE ================
+@28
+tb_riscv_dcache_2way.u_dut.clk
+tb_riscv_dcache_2way.u_dut.rst_n
+tb_riscv_dcache_2way.u_dut.cpu_req
+tb_riscv_dcache_2way.u_dut.cpu_we
+@22
+tb_riscv_dcache_2way.u_dut.cpu_wstrb[3:0]
+tb_riscv_dcache_2way.u_dut.cpu_addr[31:0]
+tb_riscv_dcache_2way.u_dut.cpu_wdata[31:0]
+tb_riscv_dcache_2way.u_dut.cpu_rdata[31:0]
+@28
+tb_riscv_dcache_2way.u_dut.cpu_ready
+tb_riscv_dcache_2way.u_dut.cpu_stall
+@200
+-================ TOP: MAINTENANCE ================
+@28
+tb_riscv_dcache_2way.u_dut.cache_flush
+tb_riscv_dcache_2way.u_dut.cache_invalidate
+tb_riscv_dcache_2way.u_dut.maint_done
+@200
+-================ TOP: MEMORY BUS ================
+@28
+tb_riscv_dcache_2way.u_dut.mem_req
+tb_riscv_dcache_2way.u_dut.mem_we
+@22
+tb_riscv_dcache_2way.u_dut.mem_addr[31:0]
+tb_riscv_dcache_2way.u_dut.mem_wdata[31:0]
+tb_riscv_dcache_2way.u_dut.mem_rdata[31:0]
+@28
+tb_riscv_dcache_2way.u_dut.mem_ready
+@200
+-================ u_ctrl: FSM ================
+^1 sim/state_names.txt
+@2024
+tb_riscv_dcache_2way.u_dut.u_ctrl.state[2:0]
+@24
+tb_riscv_dcache_2way.u_dut.u_ctrl.word_cnt[1:0]
+@28
+tb_riscv_dcache_2way.u_dut.u_ctrl.saved_victim_way
+tb_riscv_dcache_2way.u_dut.u_ctrl.flush_pending
+tb_riscv_dcache_2way.u_dut.u_ctrl.inval_pending
+@24
+tb_riscv_dcache_2way.u_dut.u_ctrl.flush_set[5:0]
+@28
+tb_riscv_dcache_2way.u_dut.u_ctrl.flush_way
+@200
+-================ u_ctrl -> u_dp: STROBES ================
+@28
+tb_riscv_dcache_2way.u_dut.dp_hit_rd
+tb_riscv_dcache_2way.u_dut.dp_hit_wr
+tb_riscv_dcache_2way.u_dut.dp_wb_load
+tb_riscv_dcache_2way.u_dut.dp_wb_clear
+tb_riscv_dcache_2way.u_dut.dp_refill_we
+tb_riscv_dcache_2way.u_dut.dp_refill_done
+tb_riscv_dcache_2way.u_dut.dp_unc_rdata
+tb_riscv_dcache_2way.u_dut.dp_inval_all
+tb_riscv_dcache_2way.u_dut.dp_flush_clean
+tb_riscv_dcache_2way.u_dut.dp_mem_ld
+@24
+tb_riscv_dcache_2way.u_dut.dp_mem_sel[1:0]
+tb_riscv_dcache_2way.u_dut.dp_mem_word[1:0]
+@200
+-================ u_dp: LOOKUP / WRITE BUFFER ================
+@22
+tb_riscv_dcache_2way.u_dut.u_dp.req_tag[21:0]
+@24
+tb_riscv_dcache_2way.u_dut.u_dp.req_index[5:0]
+tb_riscv_dcache_2way.u_dut.u_dp.req_word[1:0]
+@28
+tb_riscv_dcache_2way.u_dut.u_dp.is_uncached
+tb_riscv_dcache_2way.u_dut.u_dp.hit_way0
+tb_riscv_dcache_2way.u_dut.u_dp.hit_way1
+tb_riscv_dcache_2way.u_dut.u_dp.cache_hit
+tb_riscv_dcache_2way.u_dut.u_dp.victim_way
+tb_riscv_dcache_2way.u_dut.u_dp.victim_dirty
+tb_riscv_dcache_2way.u_dut.u_dp.wb_valid
+@22
+tb_riscv_dcache_2way.u_dut.u_dp.wb_base_addr[31:0]
+@28
+tb_riscv_dcache_2way.u_dut.u_dp.flush_line_dirty
+@200
+-================ u_ctrl -> u_perf: EVENTS ================
+@28
+tb_riscv_dcache_2way.u_dut.ev_access
+tb_riscv_dcache_2way.u_dut.ev_miss
+tb_riscv_dcache_2way.u_dut.ev_mem_xfer
+tb_riscv_dcache_2way.u_dut.ev_coherence
+@200
+-================ u_perf: COUNTERS ================
+@24
+tb_riscv_dcache_2way.u_dut.u_perf.cnt_accesses[31:0]
+tb_riscv_dcache_2way.u_dut.u_perf.cnt_misses[31:0]
+tb_riscv_dcache_2way.u_dut.u_perf.cnt_stall_cycles[31:0]
+tb_riscv_dcache_2way.u_dut.u_perf.cnt_mem_traffic[31:0]
+tb_riscv_dcache_2way.u_dut.u_perf.cnt_coherence_cyc[31:0]

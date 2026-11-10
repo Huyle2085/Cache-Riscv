@@ -1,0 +1,72 @@
+# vsim -do {run -all; quit -f} -c tb_riscv_cache_soc 
+# Loading work.tb_riscv_cache_soc
+# Loading work.riscv_cache_soc
+# Loading work.riscv_core_rv32i
+# Loading work.riscv_dcache_2way
+# Loading work.dcache_controller
+# Loading work.dcache_datapath
+# Loading work.dcache_perf_counters
+# Loading work.var_latency_mem
+# run -all 
+# ================================================================================
+#  PHAN 1: KIEM CHUNG CORE RISC-V PIPELINE 5 TANG + D-CACHE 2-WAY CHAY C (DA2)
+# ================================================================================
+# [INFO] Chuong trinh C (sw/benchmark_da2.c) da hoan tat (257 lenh RV32I retired).
+# [PASS] Test 1: Core RISC-V tinh sum = Sigma(A[i]+B[i]) = 3960 | Got: 0x00000f78
+# [PASS] Test 2: Core RISC-V SH/SB/LW Byte-Strobe (0xBEEF1234)  | Got: 0xbeef1234
+# [PASS] Test 3: LRU Chieu 1 (Evict Way 0 -> WB -> RAM) A[0]=10 | Got: 0x0000000a
+# [PASS] Test 4: LRU Chieu 1 (Evict Way 0 -> WB -> RAM) A[7]=80 | Got: 0x00000050
+# [PASS] Test 5: LRU Chieu 2 (Evict Way 1 -> WB -> RAM) B[0]=110 | Got: 0x0000006e
+# [PASS] Test 6: LRU Chieu 2 (Evict Way 1 -> WB -> RAM) B[3]=440 | Got: 0x000001b8
+# [PASS] Test 7: Set 16 Way 0 giu nguyen C[0]=111 khi Way 1 bi da | Got: 0x0000006f
+# [PASS] Test 8: Set 16 Way 1 nap dung D[0]=1111 sau khi da B[0] | Got: 0x00000457
+# [PASS] Test 9: Set 17 Way 1 giu nguyen B[7]=880 (Dirty)        | Got: 0x00000370
+# [PASS] Test 10: D-Cache RESULT[2] = status (0xCAFE0001)        | Got: 0xcafe0001
+# [PASS] Test 11a: SoC Direct-Mapped 1KB (DM-1K) tinh dung sum=3960 | Got: 0x00000f78
+# [PASS] Test 11b: SoC Direct-Mapped 2KB (DM-2K) tinh dung sum=3960 | Got: 0x00000f78
+# ================================================================================
+#  PHAN 2: KIEM THU CORNER CASES & RANDOM STRESS TEST (3 SEEDS x 200 GIAO DICH)
+# ================================================================================
+# [PASS] Test 12 [Corner Case]: Write-Miss SH tai Word cuoi (offset=3) | Got: 0xabcd000f
+# [PASS] Test 13 [Corner Case]: Byte-lane SB ket hop tren Word cuoi    | Got: 0xabcda55a
+# [PASS] Test 14 [Corner Case]: Back-to-Back Dirty Evict & Reload      | Got: 0xabcda55a
+# [COVERAGE] Set 8: 160 | Set 9: 150 | Set 10: 149 | Set 11: 141 txns
+# [COVERAGE] Tag 0: 159 | Tag 1: 150 | Tag 2 : 149 | Tag 3 : 142 txns
+# [ASSERTIONS] 15 Random Maintenance ops (T17) & 11076 Protocol Assertions PASSED
+# [PASS] st 15 [Random Stress + T17 Maint]: 600 Txns + 15 Maint vs Golden | Got: 0x00000000
+# [PASS] Test 16 [Coverage]: Do bao phu du 100%% cac Set 8..11 & Tag 0..3 | Got: 0x00000001
+# =====================================================================================================
+#  PHAN 3: BANG DOI CHUNG CONG BANG DM-1K (1KB), DM-2K (2KB) VA 2W-2K (2KB) TREN CUNG CHUONG TRINH C
+# =====================================================================================================
+#  Chi tieu danh gia        | DM-1K (64S,1W,1KB) | DM-2K (128S,1W,2KB)| 2W-2K (64S,2W,2KB) | 2W-2K vs DM-2K
+# --------------------------+--------------------+--------------------+--------------------+---------------
+#  Tong so lenh RV32I       |         257 instrs |         257 instrs |         257 instrs |       -
+#  Tong truy cap D-Cache    |        60 accesses |        60 accesses |        60 accesses |       -
+#  So lan Cache Hit         |            23 hits |            23 hits |            51 hits | +28 hits
+#  So lan Cache Miss        |          37 misses |          37 misses |           9 misses | -75.7 %
+#  Miss Rate                |            61.67 % |            61.67 % |            15.00 % | -46.67 %
+#  Stall Cycles             |        1283 cycles |        1283 cycles |         244 cycles | -81.0 %
+#  AMAT (cycles/access)     |              22.38 |              22.38 |               5.07 | -77.4 % (4.42x)
+#  Tong chu ky CPU (Cycles) |        1602 cycles |        1602 cycles |         563 cycles | -64.9 %
+#  CPI (Cycles / Instr)     |               6.23 |               6.23 |               2.19 | -64.9 %
+#  Memory Traffic           |      248W ( 992B) |      248W ( 992B) |       48W ( 192B) | -80.6 %
+# =====================================================================================================
+#  PHAN 4: BANG CHUNG DO TRE RAM BIEN THIEN (LFSR) & KHAO SAT THAY DOI RAM LATENCY
+# =====================================================================================================
+#  [1] Phan bo do tre RAM bien thien (2..5 chu ky) tren SoC 2-Way (48 word xfers):
+#      + Do tre 2 chu ky : 8 lan
+#      + Do tre 3 chu ky : 15 lan
+#      + Do tre 4 chu ky : 17 lan
+#      + Do tre 5 chu ky : 8 lan
+#      => Do tre RAM trung binh thuc nghiem: 3.52 cycles/word
+# -----------------------------------------------------------------------------------------------------
+#  [2] Khao sat anh huong khi thay doi cau hinh do tre RAM (tren cung Cache 2-Way):
+#      + Fast RAM (Co dinh 1 cyc/word)       : Stall = 123 cyc | AMAT = 3.05 | CPI = 1.72
+#      + Variable RAM (Bien thien 2..5 cyc)  : Stall = 244 cyc | AMAT = 5.07 | CPI = 2.19
+#      + Slow Variable RAM (Bien thien 4..7) : Stall = 331 cyc | AMAT = 6.52 | CPI = 2.53
+# =====================================================================================================
+#  TONG KET KIEM CHUNG DA2 : 17 PASSED, 0 FAILED
+# =====================================================================================================
+# ALL TESTS PASSED
+# ** Note: $finish    : tb/tb_riscv_cache_soc.v(809)
+#    Time: 186285 ns  Iteration: 1  Instance: /tb_riscv_cache_soc

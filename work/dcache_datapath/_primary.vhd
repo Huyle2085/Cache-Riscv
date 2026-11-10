@@ -1,0 +1,65 @@
+library verilog;
+use verilog.vl_types.all;
+entity dcache_datapath is
+    generic(
+        ADDR_WIDTH      : integer := 32;
+        DATA_WIDTH      : integer := 32;
+        NUM_SETS        : integer := 64;
+        WAYS            : integer := 2;
+        WORDS_PER_LINE  : integer := 4;
+        OFFSET_BITS     : integer := 4;
+        WORD_BITS       : integer := 2;
+        INDEX_BITS      : integer := 6;
+        TAG_BITS        : vl_notype
+    );
+    port(
+        clk             : in     vl_logic;
+        rst_n           : in     vl_logic;
+        cpu_we          : in     vl_logic;
+        cpu_wstrb       : in     vl_logic_vector(3 downto 0);
+        cpu_addr        : in     vl_logic_vector;
+        cpu_wdata       : in     vl_logic_vector;
+        cpu_rdata       : out    vl_logic_vector;
+        mem_addr        : out    vl_logic_vector;
+        mem_wdata       : out    vl_logic_vector;
+        mem_wstrb       : out    vl_logic_vector(3 downto 0);
+        mem_rdata       : in     vl_logic_vector;
+        word_cnt        : in     vl_logic_vector(1 downto 0);
+        saved_victim_way: in     vl_logic;
+        flush_set       : in     vl_logic_vector;
+        flush_way       : in     vl_logic;
+        dp_req_latch    : in     vl_logic;
+        dp_use_latched  : in     vl_logic;
+        dp_inval_all    : in     vl_logic;
+        dp_hit_rd       : in     vl_logic;
+        dp_hit_wr       : in     vl_logic;
+        dp_wb_load      : in     vl_logic;
+        dp_wb_clear     : in     vl_logic;
+        dp_refill_we    : in     vl_logic;
+        dp_refill_done  : in     vl_logic;
+        dp_unc_rdata    : in     vl_logic;
+        dp_flush_clean  : in     vl_logic;
+        dp_mem_ld       : in     vl_logic;
+        dp_mem_sel      : in     vl_logic_vector(1 downto 0);
+        dp_mem_word     : in     vl_logic_vector(1 downto 0);
+        is_uncached     : out    vl_logic;
+        cache_hit       : out    vl_logic;
+        hit_way0        : out    vl_logic;
+        hit_way1        : out    vl_logic;
+        victim_way      : out    vl_logic;
+        victim_dirty    : out    vl_logic;
+        wb_valid        : out    vl_logic;
+        wb_base_addr    : out    vl_logic_vector;
+        flush_line_dirty: out    vl_logic
+    );
+    attribute mti_svvh_generic_type : integer;
+    attribute mti_svvh_generic_type of ADDR_WIDTH : constant is 1;
+    attribute mti_svvh_generic_type of DATA_WIDTH : constant is 1;
+    attribute mti_svvh_generic_type of NUM_SETS : constant is 1;
+    attribute mti_svvh_generic_type of WAYS : constant is 1;
+    attribute mti_svvh_generic_type of WORDS_PER_LINE : constant is 1;
+    attribute mti_svvh_generic_type of OFFSET_BITS : constant is 1;
+    attribute mti_svvh_generic_type of WORD_BITS : constant is 1;
+    attribute mti_svvh_generic_type of INDEX_BITS : constant is 1;
+    attribute mti_svvh_generic_type of TAG_BITS : constant is 3;
+end dcache_datapath;
