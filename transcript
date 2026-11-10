@@ -1,4 +1,4 @@
-# vsim -do {run -all; quit -f} -c tb_riscv_cache_soc 
+# vsim -do {run -all; quit -f} -c work.tb_riscv_cache_soc 
 # Loading work.tb_riscv_cache_soc
 # Loading work.riscv_cache_soc
 # Loading work.riscv_core_rv32i
@@ -68,5 +68,5 @@
 #  TONG KET KIEM CHUNG DA2 : 17 PASSED, 0 FAILED
 # =====================================================================================================
 # ALL TESTS PASSED
-# ** Note: $finish    : tb/tb_riscv_cache_soc.v(809)
+# ** Note: $finish    : tb/tb_riscv_cache_soc.v(816)
 #    Time: 186285 ns  Iteration: 1  Instance: /tb_riscv_cache_soc

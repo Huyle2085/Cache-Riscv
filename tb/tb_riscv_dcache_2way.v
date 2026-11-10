@@ -9,9 +9,34 @@ module tb_riscv_dcache_2way;
     reg  [3:0]  cpu_wstrb;
     reg  [31:0] cpu_addr;
     reg  [31:0] cpu_wdata;
+    wire        cpu_req_ready;
     wire [31:0] cpu_rdata;
     wire        cpu_stall;
     wire        cpu_ready;
+    wire        addr_error;
+
+    // Tín hiệu kiểm thử qua dcache_req_rsp_adapter (Vấn đề B)
+    reg         use_adapter;
+    reg         m_req_valid;
+    wire        m_req_ready;
+    reg         m_req_we;
+    reg  [3:0]  m_req_wstrb;
+    reg  [31:0] m_req_addr;
+    reg  [31:0] m_req_wdata;
+    wire        m_rsp_valid;
+    wire [31:0] m_rsp_rdata;
+
+    wire        adp_cpu_req;
+    wire        adp_cpu_we;
+    wire [3:0]  adp_cpu_wstrb;
+    wire [31:0] adp_cpu_addr;
+    wire [31:0] adp_cpu_wdata;
+
+    wire        dut_cpu_req   = use_adapter ? adp_cpu_req   : cpu_req;
+    wire        dut_cpu_we    = use_adapter ? adp_cpu_we    : cpu_we;
+    wire [3:0]  dut_cpu_wstrb = use_adapter ? adp_cpu_wstrb : cpu_wstrb;
+    wire [31:0] dut_cpu_addr  = use_adapter ? adp_cpu_addr  : cpu_addr;
+    wire [31:0] dut_cpu_wdata = use_adapter ? adp_cpu_wdata : cpu_wdata;
 
     reg         cache_flush;
     reg         cache_invalidate;
@@ -37,15 +62,38 @@ module tb_riscv_dcache_2way;
     reg [31:0] snap_accesses, snap_misses, snap_stalls, snap_traffic, snap_coherence;
     real    miss_rate, amat;
 
+    // Bộ chuyển đổi giao thức 2 pha Request/Response (dcache_req_rsp_adapter - Vấn đề B)
+    dcache_req_rsp_adapter u_adapter (
+        .clk           (clk),
+        .rst_n         (rst_n),
+        .req_valid     (m_req_valid),
+        .req_ready     (m_req_ready),
+        .req_we        (m_req_we),
+        .req_wstrb     (m_req_wstrb),
+        .req_addr      (m_req_addr),
+        .req_wdata     (m_req_wdata),
+        .rsp_valid     (m_rsp_valid),
+        .rsp_rdata     (m_rsp_rdata),
+        .cpu_req       (adp_cpu_req),
+        .cpu_req_ready (cpu_req_ready),
+        .cpu_we        (adp_cpu_we),
+        .cpu_wstrb     (adp_cpu_wstrb),
+        .cpu_addr      (adp_cpu_addr),
+        .cpu_wdata     (adp_cpu_wdata),
+        .cpu_rdata     (cpu_rdata),
+        .cpu_ready     (cpu_ready)
+    );
+
     // Khởi tạo Cache 2-Way (DUT)
     riscv_dcache_2way u_dut (
         .clk               (clk),
         .rst_n             (rst_n),
-        .cpu_req           (cpu_req),
-        .cpu_we            (cpu_we),
-        .cpu_wstrb         (cpu_wstrb),
-        .cpu_addr          (cpu_addr),
-        .cpu_wdata         (cpu_wdata),
+        .cpu_req           (dut_cpu_req),
+        .cpu_req_ready     (cpu_req_ready),
+        .cpu_we            (dut_cpu_we),
+        .cpu_wstrb         (dut_cpu_wstrb),
+        .cpu_addr          (dut_cpu_addr),
+        .cpu_wdata         (dut_cpu_wdata),
         .cpu_rdata         (cpu_rdata),
         .cpu_stall         (cpu_stall),
         .cpu_ready         (cpu_ready),
@@ -66,17 +114,18 @@ module tb_riscv_dcache_2way;
         .cnt_coherence_cyc (cnt_coherence_cyc)
     );
 
-    // Khởi tạo Mô hình Bộ nhớ có Độ trễ Biến thiên
+    // Khởi tạo Mô hình Bộ nhớ có Độ trễ Biến thiên & Giải mã Địa chỉ SoC
     var_latency_mem u_mem (
-        .clk       (clk),
-        .rst_n     (rst_n),
-        .mem_req   (mem_req),
-        .mem_we    (mem_we),
-        .mem_wstrb (mem_wstrb),
-        .mem_addr  (mem_addr),
-        .mem_wdata (mem_wdata),
-        .mem_rdata (mem_rdata),
-        .mem_ready (mem_ready)
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .mem_req    (mem_req),
+        .mem_we     (mem_we),
+        .mem_wstrb  (mem_wstrb),
+        .mem_addr   (mem_addr),
+        .mem_wdata  (mem_wdata),
+        .mem_rdata  (mem_rdata),
+        .mem_ready  (mem_ready),
+        .addr_error (addr_error)
     );
 
     // Xung nhịp 100 MHz (chu kỳ 10ns)
@@ -187,7 +236,7 @@ module tb_riscv_dcache_2way;
     end
 
     // Task mô phỏng lệnh Load (CPU Read)
-    task cpu_load(input [31:0] addr, input [31:0] expected_data, input [8*56:1] test_name);
+    task cpu_load(input [31:0] addr, input [31:0] expected_data, input [8*72:1] test_name);
         begin
             @(posedge clk);
             cpu_req   <= 1'b1;
@@ -228,6 +277,12 @@ module tb_riscv_dcache_2way;
     initial begin
         clk              = 0;
         rst_n            = 0;
+        use_adapter      = 0;
+        m_req_valid      = 0;
+        m_req_we         = 0;
+        m_req_wstrb      = 4'b0000;
+        m_req_addr       = 32'd0;
+        m_req_wdata      = 32'd0;
         cpu_req          = 0;
         cpu_we           = 0;
         cpu_wstrb        = 4'b0000;
@@ -438,6 +493,90 @@ module tb_riscv_dcache_2way;
         cpu_load(32'h8000_00B0, 32'hABCD_9876, "Test 18c [T18]: Backpressure Uncached Read");
         u_mem.backpressure_extra = 0;
 
+        // 19. Kiểm chứng Vấn đề B — Giao thức 2 pha Request (req_valid/req_ready) & Response (rsp_valid):
+        //   19a: Phát xung cpu_req = 1 đúng 1 chu kỳ khi cpu_req_ready == 1 trên địa chỉ Miss (0x0000_0120),
+        //        sau đó hạ ngay cpu_req = 0. Cache vẫn phải hoàn tất Refill 4 words và báo cpu_ready = 1!
+        wait (cpu_req_ready == 1'b1);
+        @(posedge clk);
+        cpu_req   <= 1'b1;
+        cpu_we    <= 1'b0;
+        cpu_wstrb <= 4'b0000;
+        cpu_addr  <= 32'h0000_0120;
+        @(posedge clk);
+        // Hạ ngay cpu_req = 0 sau 1 chu kỳ bắt tay (trong khi Cache đang ở S_REFILL)
+        cpu_req   <= 1'b0;
+        cpu_addr  <= 32'h0000_0000;
+        wait (cpu_ready == 1'b1);
+        @(posedge clk);
+        if (cpu_rdata === 32'h1000_0048) begin
+            $display("[PASS] Test 19a [Van de B]: 1-cycle Request Pulse tren Miss hoan tat dung (0x%08h)", cpu_rdata);
+            pass_cnt = pass_cnt + 1;
+        end else begin
+            $display("[FAIL] Test 19a [Van de B]: 1-cycle Request Pulse sai du lieu (0x%08h)!", cpu_rdata);
+            fail_cnt = fail_cnt + 1;
+        end
+
+        //   19b: Kiểm thử qua dcache_req_rsp_adapter: Phát yêu cầu mới (req_valid = 1) NGAY TRONG
+        //        CHU KỲ rsp_valid == 1 (cpu_ready == 1) của giao dịch trước (Back-to-Back 0-bubble)!
+        @(posedge clk);
+        use_adapter <= 1'b1;
+        @(posedge clk);
+        // Giao dịch 1 qua Adapter: Ghi 0x7777_8888 vào 0x0000_0120 (Write Hit)
+        wait (m_req_ready == 1'b1);
+        @(posedge clk);
+        m_req_valid <= 1'b1;
+        m_req_we    <= 1'b1;
+        m_req_wstrb <= 4'b1111;
+        m_req_addr  <= 32'h0000_0120;
+        m_req_wdata <= 32'h7777_8888;
+        // Đợi sườn lên clk nơi Giao dịch 1 được bắt tay (m_req_valid && m_req_ready == 1)
+        @(posedge clk);
+        // Ngay khi sang chu kỳ kế tiếp (lúc m_rsp_valid = cpu_ready vừa bật lên 1),
+        // Master lập tức phát yêu cầu mới (Giao dịch 2: Đọc 0x0000_0120) ngay trong chu kỳ m_rsp_valid == 1!
+        m_req_valid <= 1'b1;
+        m_req_we    <= 1'b0;
+        m_req_wstrb <= 4'b0000;
+        m_req_addr  <= 32'h0000_0120;
+        m_req_wdata <= 32'h0000_0000;
+        wait (m_rsp_valid == 1'b1 && m_req_ready == 1'b1);
+        // Tại sườn lên clk kế tiếp (khi m_rsp_valid đang bằng 1), Adapter bắt tay nhận Giao dịch 2 vào Skid Buffer!
+        @(posedge clk);
+        // Hạ m_req_valid = 0 ngay sau chu kỳ bắt tay của Giao dịch 2
+        m_req_valid <= 1'b0;
+        // Đợi xung m_rsp_valid của Giao dịch 1 kết thúc sau vùng NBA, rồi bắt xung m_rsp_valid của Giao dịch 2
+        wait (m_rsp_valid == 1'b0);
+        wait (m_rsp_valid == 1'b1);
+        @(posedge clk);
+        if (m_rsp_rdata === 32'h7777_8888) begin
+            $display("[PASS] Test 19b [Van de B]: Adapter nhan Request moi ngay khi rsp_valid=1 (0x%08h)", m_rsp_rdata);
+            pass_cnt = pass_cnt + 1;
+        end else begin
+            $display("[FAIL] Test 19b [Van de B]: Adapter that bai khi phat Request luc rsp_valid=1 (0x%08h)!", m_rsp_rdata);
+            fail_cnt = fail_cnt + 1;
+        end
+        use_adapter <= 1'b0;
+        @(posedge clk);
+
+        // 20. Kiểm chứng Vấn đề C — Giải mã địa chỉ SoC không còn Alias:
+        //   - 0x0000_0010 (Cacheable Main RAM -> ram[14'h0004])
+        //   - 0x8000_0010 (Uncached Shared RAM / DMA Buffer -> ram[14'h3004])
+        //   - 0x8001_0000 (Uncached MMIO / DMA Control Register -> mmio_regs[0])
+        //   - 0x9000_0000 (Invalid Address -> addr_error = 1, rdata = 0xDEAD_BAD0)
+        cpu_store(32'h0000_0010, 32'hCACA_0010, 4'b1111); // Cached RAM
+        cpu_store(32'h8000_0010, 32'hDADA_8010, 4'b1111); // Uncached Shared RAM
+        cpu_store(32'h8001_0000, 32'hABCD_EF01, 4'b1111); // MMIO DMA Register 0
+        cpu_load(32'h0000_0010, 32'hCACA_0010, "Test 20a [Van de C]: Cached RAM 0x0000_0010 khong bi de boi 0x8000_0010");
+        cpu_load(32'h8000_0010, 32'hDADA_8010, "Test 20b [Van de C]: Uncached RAM 0x8000_0010 tach biet vat ly");
+        cpu_load(32'h8001_0000, 32'hABCD_EF01, "Test 20c [Van de C]: MMIO DMA Reg 0x8001_0000 doc/ghi chinh xac");
+        cpu_load(32'h9000_0000, 32'hDEAD_BAD0, "Test 20d [Van de C]: Invalid Addr 0x9000_0000 tra ve 0xDEAD_BAD0");
+        if (u_mem.addr_err_cnt == 1) begin
+            $display("[PASS] Test 20e [Van de C]: Bo giai ma bat co addr_error dung 1 lan cho 0x9000_0000");
+            pass_cnt = pass_cnt + 1;
+        end else begin
+            $display("[FAIL] Test 20e [Van de C]: addr_err_cnt = %0d (ky vong 1)!", u_mem.addr_err_cnt);
+            fail_cnt = fail_cnt + 1;
+        end
+
         // Chốt các bộ đếm hiệu năng trước khi thử các bài Reset cứng (Test 13 & T15)
         wait (u_dut.wb_valid == 1'b0 && u_dut.u_ctrl.state == 3'd0);
         @(posedge clk);
@@ -470,17 +609,29 @@ module tb_riscv_dcache_2way;
         end
         cpu_load(32'h0000_0060, 32'h55AA_55AA, "Test 13b: Giao dich moi hoat dong dung sau Reset");
 
-        // 15. T15 — Reset khi Write Buffer chưa drain (rst_n = 0 giữa trạng thái S_WB_DRAIN):
-        //     Làm bẩn 2 Way của Set 5 (0x0050 và 0x0450), đọc 0x0850 để đẩy Way 0 vào
-        //     Write Buffer. Ngay khi Refill xong và FSM đang ở S_WB_DRAIN (wb_valid=1),
-        //     phát xung Reset và xác nhận sau Reset hệ thống sạch sẽ, không mất/nhầm giao dịch!
-        u_mem.backpressure_extra = 6;
-        cpu_store(32'h0000_0050, 32'h5555_AAAA, 4'b1111); // Set 5, Way 0 Dirty
+        // 15. T15 (Vấn đề A) — Kiểm chứng hợp đồng bảo toàn / hủy dữ liệu khi Reset giữa S_WB_DRAIN:
+        //     - Ghi cả 4 word của dòng Set 5 Way 0 (0x0000_0050..0x0000_005C):
+        //       Word 0 = 0x5555_0000, Word 1 = 0x5555_0001, Word 2 = 0x5555_0002, Word 3 = 0x5555_0003.
+        //     - Ghi Set 5 Way 1 (0x0000_0450) rồi đọc 0x0000_0850 để đẩy Way 0 vào Write Buffer.
+        //     - Đợi trong S_WB_DRAIN đến đúng sườn clk khi Word 0 vừa hoàn tất bắt tay ghi xuống RAM
+        //       (mem_req && mem_we && mem_ready && word_cnt == 0), còn Words 1..3 chưa kịp ghi xong,
+        //       thì kéo rst_n = 0!
+        //     - Kiểm chứng trực tiếp trên RAM và qua CPU Load sau Reset:
+        //       + Word 0 (0x0000_0050 -> ram[14'h0014]) ĐÃ bắt tay xong trước Reset -> BẢO TOÀN (0x5555_0000).
+        //       + Words 1..3 (0x0000_0054..0x0000_005C -> ram[14'h0015..14'h0017]) CHƯA bắt tay xong
+        //         khi Reset -> BỊ HỦY theo hợp đồng Hard Reset (giữ nguyên giá trị RAM cũ 0x1000_0015..17).
+        u_mem.backpressure_extra = 4;
+        cpu_store(32'h0000_0050, 32'h5555_0000, 4'b1111); // Set 5, Way 0, Word 0
+        cpu_store(32'h0000_0054, 32'h5555_0001, 4'b1111); // Set 5, Way 0, Word 1
+        cpu_store(32'h0000_0058, 32'h5555_0002, 4'b1111); // Set 5, Way 0, Word 2
+        cpu_store(32'h0000_005C, 32'h5555_0003, 4'b1111); // Set 5, Way 0, Word 3
         cpu_store(32'h0000_0450, 32'h5555_BBBB, 4'b1111); // Set 5, Way 1 Dirty
-        cpu_load(32'h0000_0850, 32'h1000_0214, "Test 15a [T15]: Trigger WB Drain tren Set 5");
-        // Lúc này u_dut đang ở S_WB_DRAIN với wb_valid == 1:
-        @(posedge clk);
-        rst_n   <= 1'b0;
+        cpu_load(32'h0000_0850, 32'h1000_0214, "Test 15a [T15/Van de A]: Trigger WB Drain tren Set 5");
+        // Đợi đúng lúc Word 0 của Write Buffer hoàn tất bắt tay ghi xuống RAM (mem_ready == 1 tại word_cnt == 0)
+        wait (u_dut.u_ctrl.state == 3'd2 && mem_req == 1'b1 && mem_we == 1'b1 &&
+              mem_ready == 1'b1 && u_dut.u_ctrl.word_cnt == 2'd0);
+        @(posedge clk); // Tại sườn lên này, Word 0 đã ghi vào RAM, FSM chuyển sang word_cnt = 1
+        rst_n   <= 1'b0; // Phát Hard Reset trước khi Words 1..3 kịp hoàn thành!
         cpu_req <= 1'b0;
         @(posedge clk);
         @(posedge clk);
@@ -489,14 +640,29 @@ module tb_riscv_dcache_2way;
         @(posedge clk);
         if (u_dut.u_ctrl.state === 3'd0 && u_dut.wb_valid === 1'b0 &&
             mem_req === 1'b0 && mem_we === 1'b0 && cpu_ready === 1'b0) begin
-            $display("[PASS] Test 15b [T15]: Reset khi WB chua drain xoa sach wb_valid & FSM");
+            $display("[PASS] Test 15b [T15/Van de A]: Reset khi WB chua drain xoa sach wb_valid & FSM");
             pass_cnt = pass_cnt + 1;
         end else begin
-            $display("[FAIL] Test 15b [T15]: Trang thai WB hoac FSM khong sach sau Reset!");
+            $display("[FAIL] Test 15b [T15/Van de A]: Trang thai WB hoac FSM khong sach sau Reset!");
             fail_cnt = fail_cnt + 1;
         end
-        cpu_store(32'h0000_0050, 32'hCAFE_5555, 4'b1111);
-        cpu_load(32'h0000_0050, 32'hCAFE_5555, "Test 15c [T15]: Giao dich doc/ghi chuan sau Reset WB");
+        // Kiểm tra trực tiếp mảng RAM sau Reset giữa Write-Back:
+        if (u_mem.ram[14'h0014] === 32'h5555_0000 &&
+            u_mem.ram[14'h0015] === 32'h1000_0015 &&
+            u_mem.ram[14'h0016] === 32'h1000_0016 &&
+            u_mem.ram[14'h0017] === 32'h1000_0017) begin
+            $display("[PASS] Test 15c [T15/Van de A]: Kiem tra RAM truc tiep: Word 0 (da commit) bao toan 0x55550000, Words 1..3 (chua commit) bi huy!");
+            pass_cnt = pass_cnt + 1;
+        end else begin
+            $display("[FAIL] Test 15c [T15/Van de A]: Sai trang thai RAM sau Reset giua WB (W0=%08h, W1=%08h)!",
+                     u_mem.ram[14'h0014], u_mem.ram[14'h0015]);
+            fail_cnt = fail_cnt + 1;
+        end
+        // Đọc lại qua Cache sau Reset để xác nhận CPU thấy đúng Word 0 đã commit và Word 1 chưa commit:
+        cpu_load(32'h0000_0050, 32'h5555_0000, "Test 15d [T15/Van de A]: CPU doc lai Word 0 da commit truoc Reset");
+        cpu_load(32'h0000_0054, 32'h1000_0015, "Test 15e [T15/Van de A]: CPU doc lai Word 1 chua commit (giu gia tri cu)");
+        cpu_store(32'h0000_0054, 32'hCAFE_5555, 4'b1111);
+        cpu_load(32'h0000_0054, 32'hCAFE_5555, "Test 15f [T15/Van de A]: Giao dich doc/ghi moi hoat dong chuan sau Reset");
 
         #50;
         miss_rate = (snap_accesses > 0) ? (100.0 * snap_misses / snap_accesses) : 0.0;

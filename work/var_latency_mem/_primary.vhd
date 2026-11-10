@@ -17,7 +17,8 @@ entity var_latency_mem is
         mem_addr        : in     vl_logic_vector;
         mem_wdata       : in     vl_logic_vector;
         mem_rdata       : out    vl_logic_vector;
-        mem_ready       : out    vl_logic
+        mem_ready       : out    vl_logic;
+        addr_error      : out    vl_logic
     );
     attribute mti_svvh_generic_type : integer;
     attribute mti_svvh_generic_type of ADDR_WIDTH : constant is 1;

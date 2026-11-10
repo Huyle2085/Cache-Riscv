@@ -23,14 +23,15 @@ module riscv_dcache_2way #(
     input  wire                   rst_n,
 
     // --- Giao tiếp phía Lõi RISC-V (CPU Load/Store Unit Interface) ---
-    input  wire                   cpu_req,      // Yêu cầu đọc/ghi từ CPU
-    input  wire                   cpu_we,       // 0: Load (Read), 1: Store (Write)
-    input  wire [3:0]             cpu_wstrb,    // Byte enable (hỗ trợ SB, SH, SW)
-    input  wire [ADDR_WIDTH-1:0]  cpu_addr,     // Địa chỉ 32-bit
-    input  wire [DATA_WIDTH-1:0]  cpu_wdata,    // Dữ liệu ghi từ CPU
-    output wire [DATA_WIDTH-1:0]  cpu_rdata,    // Dữ liệu đọc trả về CPU
-    output wire                   cpu_stall,    // Giữ pipeline CPU khi Cache bận
-    output wire                   cpu_ready,    // Báo hoàn tất giao dịch trong chu kỳ hiện tại
+    input  wire                   cpu_req,       // Pha Request: Yêu cầu đọc/ghi từ Master/CPU
+    output wire                   cpu_req_ready, // Pha Request: Cache sẵn sàng nhận yêu cầu mới
+    input  wire                   cpu_we,        // 0: Load (Read), 1: Store (Write)
+    input  wire [3:0]             cpu_wstrb,     // Byte enable (hỗ trợ SB, SH, SW)
+    input  wire [ADDR_WIDTH-1:0]  cpu_addr,      // Địa chỉ 32-bit
+    input  wire [DATA_WIDTH-1:0]  cpu_wdata,     // Dữ liệu ghi từ CPU
+    output wire [DATA_WIDTH-1:0]  cpu_rdata,     // Pha Response: Dữ liệu đọc trả về CPU
+    output wire                   cpu_stall,     // Giữ pipeline CPU khi Cache bận
+    output wire                   cpu_ready,     // Pha Response: Báo hoàn tất giao dịch (rsp_valid)
 
     // --- Giao tiếp Điều khiển Nhất quán Dữ liệu (Dành cho ĐATN: CPU-DMA) ---
     input  wire                   cache_flush,      // Đẩy toàn bộ dòng Dirty xuống RAM
@@ -123,6 +124,7 @@ module riscv_dcache_2way #(
         .rst_n            (rst_n),
         .cpu_req          (cpu_req),
         .cpu_we           (cpu_we),
+        .cpu_req_ready    (cpu_req_ready),
         .cpu_ready        (cpu_ready),
         .cpu_stall        (cpu_stall),
         .cache_flush      (cache_flush),

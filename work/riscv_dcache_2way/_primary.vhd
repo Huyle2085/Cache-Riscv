@@ -12,6 +12,7 @@ entity riscv_dcache_2way is
         clk             : in     vl_logic;
         rst_n           : in     vl_logic;
         cpu_req         : in     vl_logic;
+        cpu_req_ready   : out    vl_logic;
         cpu_we          : in     vl_logic;
         cpu_wstrb       : in     vl_logic_vector(3 downto 0);
         cpu_addr        : in     vl_logic_vector;

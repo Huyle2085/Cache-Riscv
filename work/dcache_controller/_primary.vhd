@@ -12,6 +12,7 @@ entity dcache_controller is
         rst_n           : in     vl_logic;
         cpu_req         : in     vl_logic;
         cpu_we          : in     vl_logic;
+        cpu_req_ready   : out    vl_logic;
         cpu_ready       : out    vl_logic;
         cpu_stall       : out    vl_logic;
         cache_flush     : in     vl_logic;

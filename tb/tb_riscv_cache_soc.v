@@ -66,15 +66,16 @@ module tb_riscv_cache_soc;
         .BASE_DELAY (3'd2),
         .VAR_ENABLE (1)
     ) u_mem_2w (
-        .clk       (clk),
-        .rst_n     (rst_n),
-        .mem_req   (mem_req_2w),
-        .mem_we    (mem_we_2w),
-        .mem_wstrb (mem_wstrb_2w),
-        .mem_addr  (mem_addr_2w),
-        .mem_wdata (mem_wdata_2w),
-        .mem_rdata (mem_rdata_2w),
-        .mem_ready (mem_ready_2w)
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .mem_req    (mem_req_2w),
+        .mem_we     (mem_we_2w),
+        .mem_wstrb  (mem_wstrb_2w),
+        .mem_addr   (mem_addr_2w),
+        .mem_wdata  (mem_wdata_2w),
+        .mem_rdata  (mem_rdata_2w),
+        .mem_ready  (mem_ready_2w),
+        .addr_error ()
     );
 
     // --- (B1) SoC Direct-Mapped 1 KB (DM-1K: 64 Sets x 1 Way, RAM 2..5 cycles) ---
@@ -115,15 +116,16 @@ module tb_riscv_cache_soc;
         .BASE_DELAY (3'd2),
         .VAR_ENABLE (1)
     ) u_mem_dm (
-        .clk       (clk),
-        .rst_n     (rst_n),
-        .mem_req   (mem_req_dm),
-        .mem_we    (mem_we_dm),
-        .mem_wstrb (mem_wstrb_dm),
-        .mem_addr  (mem_addr_dm),
-        .mem_wdata (mem_wdata_dm),
-        .mem_rdata (mem_rdata_dm),
-        .mem_ready (mem_ready_dm)
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .mem_req    (mem_req_dm),
+        .mem_we     (mem_we_dm),
+        .mem_wstrb  (mem_wstrb_dm),
+        .mem_addr   (mem_addr_dm),
+        .mem_wdata  (mem_wdata_dm),
+        .mem_rdata  (mem_rdata_dm),
+        .mem_ready  (mem_ready_dm),
+        .addr_error ()
     );
 
     // --- (B2) SoC Direct-Mapped 2 KB (DM-2K: 128 Sets x 1 Way, cùng dung lượng 2 KB với 2W-2K) ---
@@ -164,15 +166,16 @@ module tb_riscv_cache_soc;
         .BASE_DELAY (3'd2),
         .VAR_ENABLE (1)
     ) u_mem_dm2k (
-        .clk       (clk),
-        .rst_n     (rst_n),
-        .mem_req   (mem_req_dm2k),
-        .mem_we    (mem_we_dm2k),
-        .mem_wstrb (mem_wstrb_dm2k),
-        .mem_addr  (mem_addr_dm2k),
-        .mem_wdata (mem_wdata_dm2k),
-        .mem_rdata (mem_rdata_dm2k),
-        .mem_ready (mem_ready_dm2k)
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .mem_req    (mem_req_dm2k),
+        .mem_we     (mem_we_dm2k),
+        .mem_wstrb  (mem_wstrb_dm2k),
+        .mem_addr   (mem_addr_dm2k),
+        .mem_wdata  (mem_wdata_dm2k),
+        .mem_rdata  (mem_rdata_dm2k),
+        .mem_ready  (mem_ready_dm2k),
+        .addr_error ()
     );
 
     // --- (C) SoC 2-Way với Fast RAM (Cố định 1 chu kỳ) ---
@@ -213,15 +216,16 @@ module tb_riscv_cache_soc;
         .BASE_DELAY (3'd1),
         .VAR_ENABLE (0)
     ) u_mem_fast (
-        .clk       (clk),
-        .rst_n     (rst_n),
-        .mem_req   (mem_req_fast),
-        .mem_we    (mem_we_fast),
-        .mem_wstrb (mem_wstrb_fast),
-        .mem_addr  (mem_addr_fast),
-        .mem_wdata (mem_wdata_fast),
-        .mem_rdata (mem_rdata_fast),
-        .mem_ready (mem_ready_fast)
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .mem_req    (mem_req_fast),
+        .mem_we     (mem_we_fast),
+        .mem_wstrb  (mem_wstrb_fast),
+        .mem_addr   (mem_addr_fast),
+        .mem_wdata  (mem_wdata_fast),
+        .mem_rdata  (mem_rdata_fast),
+        .mem_ready  (mem_ready_fast),
+        .addr_error ()
     );
 
     // --- (D) SoC 2-Way với Slow Variable RAM (Biến thiên 4..7 chu kỳ) ---
@@ -262,15 +266,16 @@ module tb_riscv_cache_soc;
         .BASE_DELAY (3'd4),
         .VAR_ENABLE (1)
     ) u_mem_slow (
-        .clk       (clk),
-        .rst_n     (rst_n),
-        .mem_req   (mem_req_slow),
-        .mem_we    (mem_we_slow),
-        .mem_wstrb (mem_wstrb_slow),
-        .mem_addr  (mem_addr_slow),
-        .mem_wdata (mem_wdata_slow),
-        .mem_rdata (mem_rdata_slow),
-        .mem_ready (mem_ready_slow)
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .mem_req    (mem_req_slow),
+        .mem_we     (mem_we_slow),
+        .mem_wstrb  (mem_wstrb_slow),
+        .mem_addr   (mem_addr_slow),
+        .mem_wdata  (mem_wdata_slow),
+        .mem_rdata  (mem_rdata_slow),
+        .mem_ready  (mem_ready_slow),
+        .addr_error ()
     );
 
     // =========================================================================
@@ -291,6 +296,7 @@ module tb_riscv_cache_soc;
         .clk               (clk),
         .rst_n             (rst_n),
         .cpu_req           (st_req),
+        .cpu_req_ready     (),
         .cpu_we            (st_we),
         .cpu_wstrb         (st_wstrb),
         .cpu_addr          (st_addr),
@@ -319,15 +325,16 @@ module tb_riscv_cache_soc;
         .BASE_DELAY (3'd2),
         .VAR_ENABLE (1)
     ) u_mem_stress (
-        .clk       (clk),
-        .rst_n     (rst_n),
-        .mem_req   (st_mem_req),
-        .mem_we    (st_mem_we),
-        .mem_wstrb (st_mem_wstrb),
-        .mem_addr  (st_mem_addr),
-        .mem_wdata (st_mem_wdata),
-        .mem_rdata (st_mem_rdata),
-        .mem_ready (st_mem_ready)
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .mem_req    (st_mem_req),
+        .mem_we     (st_mem_we),
+        .mem_wstrb  (st_mem_wstrb),
+        .mem_addr   (st_mem_addr),
+        .mem_wdata  (st_mem_wdata),
+        .mem_rdata  (st_mem_rdata),
+        .mem_ready  (st_mem_ready),
+        .addr_error ()
     );
 
     // Mảng bộ nhớ chuẩn (Golden Scoreboard) để đối chiếu tự động trong Random Test

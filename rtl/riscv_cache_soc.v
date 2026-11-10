@@ -43,11 +43,16 @@ module riscv_cache_soc #(
 );
 
     // -------------------------------------------------------------------------
-    // Bộ nhớ lệnh (Instruction Memory - IMEM)
+    // Bộ nhớ lệnh (Instruction Memory - Synchronous ROM cho M10K FPGA DE10-Standard)
+    //   - Đọc đồng bộ theo sườn lên xung nhịp (always @(posedge clk)) để Quartus
+    //     ánh xạ trực tiếp vào khối phần cứng M10K Block RAM trên Cyclone V.
+    //   - Lõi riscv_core_rv32i tích hợp bộ đệm giữ lệnh (Instruction Skid Buffer)
+    //     ở tầng IF/ID để xử lý độ trễ đọc đồng bộ 1 chu kỳ khi Pipeline bị Stall
+    //     mà không làm lệch PC hay lặp lệnh.
     // -------------------------------------------------------------------------
-    reg [31:0] imem [0:IMEM_WORDS-1];
+    (* ramstyle = "M10K" *) reg [31:0] imem [0:IMEM_WORDS-1];
     wire [31:0] imem_addr;
-    wire [31:0] imem_rdata = imem[imem_addr[9:2]];
+    reg  [31:0] imem_rdata;
 
     integer k;
     initial begin
@@ -55,6 +60,10 @@ module riscv_cache_soc #(
             imem[k] = 32'h0000_0013; // NOP (addi x0, x0, 0)
         if (IMEM_INIT_FILE != "")
             $readmemh(IMEM_INIT_FILE, imem);
+    end
+
+    always @(posedge clk) begin
+        imem_rdata <= imem[imem_addr[9:2]];
     end
 
     // -------------------------------------------------------------------------
@@ -102,6 +111,7 @@ module riscv_cache_soc #(
         .clk               (clk),
         .rst_n             (rst_n),
         .cpu_req           (dcache_req),
+        .cpu_req_ready     (),
         .cpu_we            (dcache_we),
         .cpu_wstrb         (dcache_wstrb),
         .cpu_addr          (dcache_addr),

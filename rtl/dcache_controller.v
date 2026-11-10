@@ -16,9 +16,10 @@ module dcache_controller #(
     input  wire                  clk,
     input  wire                  rst_n,
 
-    // --- Yêu cầu từ CPU ---
+    // --- Yêu cầu từ CPU (Giao thức 2 pha: Request cpu_req/cpu_req_ready & Response cpu_ready) ---
     input  wire                  cpu_req,
     input  wire                  cpu_we,
+    output wire                  cpu_req_ready,
     output reg                   cpu_ready,
     output wire                  cpu_stall,
 
@@ -88,7 +89,7 @@ module dcache_controller #(
     localparam MS_WB       = 2'd2;
     localparam MS_FLUSH    = 2'd3;
 
-    localparam [1:0] LAST_WORD = WORDS_PER_LINE - 1;
+    localparam [1:0] LAST_WORD = WORDS_PER_LINE[1:0] - 2'd1;
 
     // -------------------------------------------------------------------------
     // Thanh ghi nội bộ
@@ -107,6 +108,13 @@ module dcache_controller #(
     wire req_busy    = cpu_pending || req_active;
     wire last_word   = (word_cnt == LAST_WORD);
     wire flush_end   = (flush_set_cnt >= NUM_SETS);
+
+    // Tín hiệu báo Cache sẵn sàng nhận yêu cầu mới (Pha Request: cpu_req && cpu_req_ready == 1).
+    // Khi bắt tay thành công tại S_IDLE:
+    //   - Nếu Hit: trả kết quả ngay ở chu kỳ kế (cpu_ready = 1).
+    //   - Nếu Miss / Uncached: yêu cầu được chốt vào thanh ghi (dp_req_latch = 1, req_active = 1)
+    //     và xử lý đến hết mà không phụ thuộc vào việc master có giữ cpu_req hay không.
+    assign cpu_req_ready = (state == S_IDLE) && !wb_valid && !flush_req && !inval_req && !cpu_ready;
 
     // -------------------------------------------------------------------------
     // Giá trị kế tiếp
@@ -354,6 +362,19 @@ module dcache_controller #(
 
     // -------------------------------------------------------------------------
     // Khối tuần tự: cập nhật thanh ghi
+    // Hợp đồng phần cứng khi Reset cứng (Hard Reset: rst_n = 0):
+    //   1. Dữ liệu ĐÃ ĐƯỢC BẢO TOÀN trong RAM:
+    //      - Mọi giao dịch ghi đã báo hoàn tất (cpu_ready = 1 cho Uncached, hoặc
+    //        maint_done = 1 cho CLEAN / CLEAN_INVALIDATE) trước khi rst_n = 0.
+    //      - Các word riêng lẻ (0 .. k-1) của Write Buffer đã hoàn tất bắt tay
+    //        (mem_req && mem_we && mem_ready == 1) tại sườn lên clk trước khi rst_n = 0.
+    //   2. Dữ liệu BỊ HỦY (Aborted) và được phép mất khi Hard Reset:
+    //      - Các dòng Dirty còn nằm trong mảng Cache (dirty_array == 1) chưa ghi trả.
+    //      - Các word còn lại (k .. 3) đang chờ trong Write Buffer (wb_valid == 1)
+    //        chưa hoàn tất bắt tay mem_ready = 1 tại thời điểm rst_n = 0.
+    //      - Các giao dịch Miss Refill / Uncached đang bay (chưa báo cpu_ready = 1).
+    //   3. Quy ước Warm Reset: Để bảo toàn 100% dữ liệu bẩn trước khi khởi động lại,
+    //      hệ thống phải phát lệnh CLEAN (cache_flush = 1) và đợi maint_done == 1.
     // -------------------------------------------------------------------------
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin

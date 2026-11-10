@@ -68,10 +68,18 @@ module riscv_core_rv32i #(
     // =========================================================================
     // Khai báo các thanh ghi đường ống (Pipeline Registers)
     // =========================================================================
-    // --- 1. Thanh ghi IF/ID ---
+    // --- 1. Thanh ghi IF/ID & Skid Buffer cho Synchronous IMEM (M10K Block RAM) ---
+    // Vì IMEM đọc đồng bộ theo xung nhịp (always @(posedge clk) imem_rdata <= imem[imem_addr]),
+    // trong chế độ chạy liên tục không dừng, tại sườn lên clk khi if_id_pc chốt imem_addr thì
+    // thanh ghi đầu ra M10K (imem_rdata) cũng đồng thời chốt lệnh tương ứng với if_id_pc.
+    // Khi Pipeline bị dừng (mem_stall hoặc load_use_hazard), imem_rdata đã kịp chuyển sang
+    // lệnh kế tiếp; do đó bộ đệm if_instr_buf sẽ bắt giữ lại lệnh hiện tại ở chu kỳ đầu tiên
+    // của Stall để bảo toàn tuyệt đối lệnh tại tầng ID mà không bị lệch PC hay lặp lệnh.
     reg        if_id_valid;
     reg [31:0] if_id_pc;
-    reg [31:0] if_id_instr;
+    reg        if_buf_valid;
+    reg [31:0] if_instr_buf;
+    wire [31:0] if_id_instr = if_buf_valid ? if_instr_buf : imem_rdata;
 
     // --- 2. Thanh ghi ID/EX ---
     reg        id_ex_valid;
@@ -319,6 +327,7 @@ module riscv_core_rv32i #(
     // và Register File
     // =========================================================================
     always @(posedge clk or negedge rst_n) begin
+        i = 0;
         if (!rst_n) begin
             imem_addr        <= RESET_PC;
             halted           <= 1'b0;
@@ -327,7 +336,8 @@ module riscv_core_rv32i #(
 
             if_id_valid      <= 1'b0;
             if_id_pc         <= 32'd0;
-            if_id_instr      <= 32'h0000_0013;
+            if_buf_valid     <= 1'b0;
+            if_instr_buf     <= 32'h0000_0013;
 
             id_ex_valid      <= 1'b0;
             id_ex_pc         <= 32'd0;
@@ -385,6 +395,11 @@ module riscv_core_rv32i #(
             // -----------------------------------------------------------------
             if (mem_stall) begin
                 // D-Cache đang bận: giữ nguyên IF/ID, ID/EX, EX/MEM; chèn bubble vào MEM/WB.
+                // Chốt lại lệnh từ Synchronous IMEM vào Skid Buffer nếu chưa chốt.
+                if (!if_buf_valid) begin
+                    if_buf_valid <= 1'b1;
+                    if_instr_buf <= imem_rdata;
+                end
                 // Chốt lại giá trị đã Forwarding ở EX để không bị mất khi lệnh ở MEM/WB vừa thoát đi.
                 mem_wb_valid  <= 1'b0;
                 id_ex_rs1_val <= ex_rs1_val;
@@ -413,15 +428,22 @@ module riscv_core_rv32i #(
 
                 // --- Chuyển tầng IF/ID -> ID/EX & Cập nhật PC ---
                 if (ex_take_branch) begin
-                    // Rẽ nhánh thành công ở EX: Xóa (Flush) IF/ID và ID/EX, nạp PC đích
+                    // Rẽ nhánh thành công ở EX: Xóa (Flush) IF/ID, Skid Buffer và ID/EX, nạp PC đích
                     imem_addr       <= ex_branch_target;
                     if_id_valid     <= 1'b0;
+                    if_buf_valid    <= 1'b0;
                     id_ex_valid     <= 1'b0;
                 end else if (load_use_hazard) begin
-                    // Load-Use Hazard: Giữ nguyên PC và IF/ID trong 1 chu kỳ, chèn Bubble vào ID/EX
+                    // Load-Use Hazard: Giữ nguyên PC và IF/ID trong 1 chu kỳ, chèn Bubble vào ID/EX.
+                    // Chốt lệnh hiện tại từ Synchronous IMEM vào Skid Buffer để chu kỳ sau dùng lại.
                     id_ex_valid     <= 1'b0;
+                    if (!if_buf_valid) begin
+                        if_buf_valid <= 1'b1;
+                        if_instr_buf <= imem_rdata;
+                    end
                 end else begin
-                    // Hoạt động bình thường: dịch lệnh từ IF/ID sang ID/EX
+                    // Hoạt động bình thường: dịch lệnh từ IF/ID sang ID/EX, giải phóng Skid Buffer
+                    if_buf_valid    <= 1'b0;
                     id_ex_valid     <= if_id_valid;
                     id_ex_pc        <= if_id_pc;
                     id_ex_opcode    <= id_opcode;
@@ -438,13 +460,12 @@ module riscv_core_rv32i #(
                     id_ex_rf_we     <= id_rf_we;
                     id_ex_is_system <= id_is_system;
 
-                    // Nạp lệnh mới từ IMEM vào IF/ID (ngừng nạp thêm sau khi gặp EBREAK)
+                    // Nạp lệnh mới từ Synchronous IMEM vào IF/ID (ngừng nạp thêm sau khi gặp EBREAK)
                     if (system_in_pipe) begin
                         if_id_valid <= 1'b0;
                     end else begin
                         if_id_valid <= 1'b1;
                         if_id_pc    <= imem_addr;
-                        if_id_instr <= imem_rdata;
                         imem_addr   <= imem_addr + 32'd4;
                     end
                 end
