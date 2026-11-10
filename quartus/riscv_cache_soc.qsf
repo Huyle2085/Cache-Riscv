@@ -6,6 +6,7 @@
 set_global_assignment -name FAMILY "Cyclone V"
 set_global_assignment -name DEVICE 5CSXFC6D6F31C6
 set_global_assignment -name TOP_LEVEL_ENTITY riscv_cache_soc
+set_global_assignment -name ALLOW_ANY_RAM_SIZE_FOR_RECOGNITION ON
 set_global_assignment -name VERILOG_FILE ../rtl/dcache_perf_counters.v
 set_global_assignment -name VERILOG_FILE ../rtl/dcache_controller.v
 set_global_assignment -name VERILOG_FILE ../rtl/dcache_datapath.v

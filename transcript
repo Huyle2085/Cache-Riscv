@@ -32,7 +32,7 @@
 # [PASS] Test 14 [Corner Case]: Back-to-Back Dirty Evict & Reload      | Got: 0xabcda55a
 # [COVERAGE] Set 8: 160 | Set 9: 150 | Set 10: 149 | Set 11: 141 txns
 # [COVERAGE] Tag 0: 159 | Tag 1: 150 | Tag 2 : 149 | Tag 3 : 142 txns
-# [ASSERTIONS] 15 Random Maintenance ops (T17) & 11076 Protocol Assertions PASSED
+# [ASSERTIONS] 15 Random Maintenance ops (T17) & 11023 Protocol Assertions PASSED
 # [PASS] st 15 [Random Stress + T17 Maint]: 600 Txns + 15 Maint vs Golden | Got: 0x00000000
 # [PASS] Test 16 [Coverage]: Do bao phu du 100%% cac Set 8..11 & Tag 0..3 | Got: 0x00000001
 # =====================================================================================================
@@ -68,5 +68,5 @@
 #  TONG KET KIEM CHUNG DA2 : 17 PASSED, 0 FAILED
 # =====================================================================================================
 # ALL TESTS PASSED
-# ** Note: $finish    : tb/tb_riscv_cache_soc.v(816)
+# ** Note: $finish    : tb/tb_riscv_cache_soc.v(828)
 #    Time: 186285 ns  Iteration: 1  Instance: /tb_riscv_cache_soc

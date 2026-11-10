@@ -1,10 +1,11 @@
 `timescale 1ns / 1ps
 // =============================================================================
 // dcache_datapath.v
-// Đường dữ liệu của D-Cache 2-way set-associative.
-//   - Chứa Tag / Valid / Dirty / Data array, bit LRU và Write Buffer.
-//   - Tra cứu Hit/Miss song song 2 way, chọn Victim way.
-//   - Tạo thanh ghi cpu_rdata, mem_addr, mem_wdata.
+// Đường dữ liệu của D-Cache 2-way set-associative (Kiến trúc Data Array đồng bộ M10K).
+//   - Tag / Valid / Dirty / LRU array dùng cho tra cứu Hit/Miss nhanh trong S_IDLE.
+//   - Data Array được thiết kế theo chuẩn bộ nhớ đồng bộ (Synchronous Dual-Port RAM
+//     với Byte-Enable theo 4 byte-lane 1D array mỗi word/way) để Quartus II suy diễn
+//     trực tiếp thành các khối phần cứng M10K Block RAM trên FPGA DE10-Standard.
 //   - Mọi thao tác ghi đều do strobe từ dcache_controller ra lệnh.
 // =============================================================================
 module dcache_datapath #(
@@ -26,7 +27,7 @@ module dcache_datapath #(
     input  wire [3:0]            cpu_wstrb,
     input  wire [ADDR_WIDTH-1:0] cpu_addr,
     input  wire [DATA_WIDTH-1:0] cpu_wdata,
-    output reg  [DATA_WIDTH-1:0] cpu_rdata,
+    output wire [DATA_WIDTH-1:0] cpu_rdata,
 
     // --- Dữ liệu bộ nhớ ---
     output reg  [ADDR_WIDTH-1:0] mem_addr,
@@ -72,6 +73,7 @@ module dcache_datapath #(
     localparam MS_REFILL   = 2'd1;
     localparam MS_WB       = 2'd2;
     localparam MS_FLUSH    = 2'd3;
+    localparam WAY1_IDX    = (WAYS > 1) ? 1 : 0;
 
     // -------------------------------------------------------------------------
     // Thanh ghi chốt yêu cầu CPU (Bảo đảm hợp đồng giao tiếp ổn định suốt Miss/Uncached)
@@ -100,30 +102,26 @@ module dcache_datapath #(
     assign is_uncached = eff_addr[31]; // bit 31 = 1: Bypass Cache (Uncached RAM & MMIO/DMA)
 
     // -------------------------------------------------------------------------
-    // Mảng lưu trữ
+    // Mảng Metadata (Tag / Valid / Dirty / LRU) và Write Buffer
     // -------------------------------------------------------------------------
     reg [TAG_BITS-1:0]   tag_array   [0:NUM_SETS-1][0:WAYS-1];
-    reg [DATA_WIDTH-1:0] data_array  [0:NUM_SETS-1][0:WAYS-1][0:WORDS_PER_LINE-1];
     reg                  valid_array [0:NUM_SETS-1][0:WAYS-1];
     reg                  dirty_array [0:NUM_SETS-1][0:WAYS-1];
     reg                  lru_bit     [0:NUM_SETS-1]; // 0: Way 0 là LRU, 1: Way 1 là LRU
 
-    // Write Buffer (Eviction Buffer 1 dòng)
+    // Write Buffer (Eviction Buffer 1 dòng = 4 words)
     reg [DATA_WIDTH-1:0] wb_data [0:WORDS_PER_LINE-1];
+    reg                  wb_load_d1; // Trễ 1 nhịp sau dp_wb_load để bắt dữ liệu đọc đồng bộ từ M10K
+
+    // Thanh ghi giữ dữ liệu trả về CPU & cờ định tuyến đầu ra đồng bộ M10K khi Read-Hit
+    reg [DATA_WIDTH-1:0] cpu_rdata_q;
+    reg                  hit_rd_valid_q;
+    reg                  hit_way_q;
+    reg [1:0]            hit_word_q;
 
     // -------------------------------------------------------------------------
-    // Hợp nhất Đường truy cập Đọc/Ghi cho Tag Array & Data Array (Giải quyết Mục 3.1
-    // khi tổng hợp trên FPGA DE10-Standard):
-    //   - Các thao tác đọc Data Array (Hit Read, Load Write Buffer, Refill Bypass,
-    //     và Flush Read) hoàn toàn loại trừ nhau theo thời gian (mutually exclusive).
-    //   - Do đó, toàn bộ các đường đọc được dồn kênh (multiplex) về DUY NHẤT 1 địa chỉ
-    //     đọc (rd_set, rd_way) trên 4 word của dòng Cache, và toàn bộ các đường ghi
-    //     (Hit Write, Refill Word Write, Refill CPU Write) được dồn về DUY NHẤT 1 địa
-    //     chỉ ghi (req_index, wr_way), giúp giảm mạnh số bộ dồn kênh (MUX) và ALM.
+    // Tra cứu Hit/Miss song song trên Metadata
     // -------------------------------------------------------------------------
-    localparam WAY1_IDX = (WAYS > 1) ? 1 : 0;
-
-    // Tra cứu Tag trực tiếp theo req_index (tránh vòng lặp tổ hợp từ strobe của Controller)
     assign hit_way0  = valid_array[req_index][0] && (tag_array[req_index][0] == req_tag) && !is_uncached;
     assign hit_way1  = (WAYS > 1) ? (valid_array[req_index][WAY1_IDX] &&
                                      (tag_array[req_index][WAY1_IDX] == req_tag) && !is_uncached)
@@ -141,26 +139,7 @@ module dcache_datapath #(
     // Dòng tại con trỏ Flush
     assign flush_line_dirty = valid_array[flush_set][flush_way] && dirty_array[flush_set][flush_way];
 
-    // Chọn Set, Way và Word duy nhất cho cổng đọc hợp nhất của Data Array
-    wire                  is_flush_rd = dp_mem_ld && (dp_mem_sel == MS_FLUSH);
-    wire [INDEX_BITS-1:0] rd_set      = is_flush_rd    ? flush_set        : req_index;
-    wire                  rd_way      = is_flush_rd    ? flush_way        :
-                                        dp_refill_done ? saved_victim_way :
-                                        dp_wb_load     ? victim_way       : hit_way;
-    wire [1:0]            rd_word     = is_flush_rd    ? dp_mem_word      : req_word;
-    wire [TAG_BITS-1:0]   rd_tag_sel  = tag_array[rd_set][rd_way];
-
-    wire [DATA_WIDTH-1:0] rd_line_w0  = data_array[rd_set][rd_way][0];
-    wire [DATA_WIDTH-1:0] rd_line_w1  = data_array[rd_set][rd_way][1];
-    wire [DATA_WIDTH-1:0] rd_line_w2  = data_array[rd_set][rd_way][2];
-    wire [DATA_WIDTH-1:0] rd_line_w3  = data_array[rd_set][rd_way][3];
-
-    wire [DATA_WIDTH-1:0] rd_word_mux = (rd_word == 2'd0) ? rd_line_w0 :
-                                        (rd_word == 2'd1) ? rd_line_w1 :
-                                        (rd_word == 2'd2) ? rd_line_w2 :
-                                                            rd_line_w3;
-
-    // Ghi theo Byte Mask (hỗ trợ SB/SH/SW)
+    // Ghi theo Byte Mask (hỗ trợ SB/SH/SW khi trộn dữ liệu Refill Write-Miss)
     function [DATA_WIDTH-1:0] apply_wstrb(
         input [DATA_WIDTH-1:0] old_word,
         input [DATA_WIDTH-1:0] new_word,
@@ -174,14 +153,80 @@ module dcache_datapath #(
         end
     endfunction
 
-    // Word CPU yêu cầu trong lúc kết thúc Refill: word cuối vừa về chưa nằm trong array
-    wire [DATA_WIDTH-1:0] refill_req_word =
-        (req_word == WORDS_PER_LINE-1) ? mem_rdata : rd_word_mux;
+    // -------------------------------------------------------------------------
+    // KIẾN TRÚC DATA ARRAY ĐỒNG BỘ SUY DIỄN M10K BLOCK RAM (Mục 3.1 - DE10-Standard)
+    //   - Mỗi (way, word) được tổ chức thành 4 mảng 1 chiều 8-bit (bank_b0..bank_b3)
+    //     có chỉ dẫn (* ramstyle = "M10K, no_rw_check" *).
+    //   - Cổng Ghi đồng bộ (wr_set = req_index):
+    //       + Khi Write-Hit (dp_hit_wr): ghi trực tiếp theo Byte-Enable cpu_wstrb[3:0]
+    //         mà KHÔNG cần đọc tổ hợp dữ liệu cũ.
+    //       + Khi Refill (dp_refill_we): nếu là Write-Miss tại đúng word CPU yêu cầu
+    //         (eff_we && word_cnt == req_word), trộn luôn eff_wdata với mem_rdata theo
+    //         eff_wstrb và ghi 1 lần duy nhất vào M10K.
+    //   - Cổng Đọc đồng bộ (rd_set = is_flush_mode ? flush_set : req_index):
+    //       + Dữ liệu đọc luôn chốt qua thanh ghi rdata_q tại sườn lên clk, đúng mẫu
+    //         suy diễn Simple Dual-Port Synchronous RAM (altsyncram / M10K) của Quartus.
+    // -------------------------------------------------------------------------
+    wire                  is_flush_mode = (dp_mem_sel == MS_FLUSH);
+    wire [INDEX_BITS-1:0] rd_set        = is_flush_mode ? flush_set : req_index;
+    wire [INDEX_BITS-1:0] wr_set        = req_index;
+
+    wire [DATA_WIDTH-1:0] refill_wdata_merged =
+        (eff_we && (word_cnt == req_word)) ? apply_wstrb(mem_rdata, eff_wdata, eff_wstrb)
+                                           : mem_rdata;
+
+    wire [DATA_WIDTH-1:0] ram_rdata [0:WAYS-1][0:WORDS_PER_LINE-1];
+
+    genvar gw, gk;
+    generate
+        for (gw = 0; gw < WAYS; gw = gw + 1) begin : gen_way
+            for (gk = 0; gk < WORDS_PER_LINE; gk = gk + 1) begin : gen_word
+                (* ramstyle = "M10K, no_rw_check" *) reg [7:0] bank_b0 [0:NUM_SETS-1];
+                (* ramstyle = "M10K, no_rw_check" *) reg [7:0] bank_b1 [0:NUM_SETS-1];
+                (* ramstyle = "M10K, no_rw_check" *) reg [7:0] bank_b2 [0:NUM_SETS-1];
+                (* ramstyle = "M10K, no_rw_check" *) reg [7:0] bank_b3 [0:NUM_SETS-1];
+                reg [DATA_WIDTH-1:0] rdata_q;
+
+                wire hit_we_here    = dp_hit_wr    && (hit_way == gw[0])          && (req_word == gk[1:0]);
+                wire refill_we_here = dp_refill_we && (saved_victim_way == gw[0]) && (word_cnt == gk[1:0]);
+                wire bank_we        = hit_we_here || refill_we_here;
+                wire [3:0] bank_be  = hit_we_here ? cpu_wstrb : 4'b1111;
+                wire [DATA_WIDTH-1:0] bank_wdata = hit_we_here ? cpu_wdata : refill_wdata_merged;
+
+                always @(posedge clk) begin
+                    if (bank_we && bank_be[0]) bank_b0[wr_set] <= bank_wdata[7:0];
+                    if (bank_we && bank_be[1]) bank_b1[wr_set] <= bank_wdata[15:8];
+                    if (bank_we && bank_be[2]) bank_b2[wr_set] <= bank_wdata[23:16];
+                    if (bank_we && bank_be[3]) bank_b3[wr_set] <= bank_wdata[31:24];
+
+                    rdata_q[7:0]   <= bank_b0[rd_set];
+                    rdata_q[15:8]  <= bank_b1[rd_set];
+                    rdata_q[23:16] <= bank_b2[rd_set];
+                    rdata_q[31:24] <= bank_b3[rd_set];
+                end
+
+                assign ram_rdata[gw][gk] = rdata_q;
+            end
+        end
+    endgenerate
+
+    // Chọn dữ liệu từ đầu ra đồng bộ M10K cho Read-Hit và Flush
+    wire [DATA_WIDTH-1:0] hit_rdata_mux =
+        (hit_way_q && (WAYS > 1)) ? ram_rdata[WAY1_IDX][hit_word_q]
+                                  : ram_rdata[0][hit_word_q];
+
+    wire [DATA_WIDTH-1:0] flush_rdata_mux =
+        (flush_way && (WAYS > 1)) ? ram_rdata[WAY1_IDX][dp_mem_word]
+                                  : ram_rdata[0][dp_mem_word];
+
+    // Ngõ ra cpu_rdata: Trong chu kỳ ngay sau dp_hit_rd (hit_rd_valid_q == 1), lấy trực tiếp
+    // từ thanh ghi đồng bộ rdata_q của M10K; các chu kỳ sau giữ ổn định trong cpu_rdata_q.
+    assign cpu_rdata = hit_rd_valid_q ? hit_rdata_mux : cpu_rdata_q;
 
     integer s, w, k;
 
     // -------------------------------------------------------------------------
-    // Cập nhật Metadata (Valid, Dirty, LRU, Write Buffer status) + cpu_rdata
+    // Cập nhật Metadata (Valid, Dirty, LRU, Write Buffer status) + cpu_rdata_q
     // Hợp đồng phần cứng khi Reset cứng (Hard Reset: rst_n = 0):
     //   - Khi rst_n = 0, wb_valid cùng toàn bộ valid_array và dirty_array bị xóa về 0
     //     để đưa Cache về trạng thái khởi đầu sạch.
@@ -196,13 +241,17 @@ module dcache_datapath #(
         s = 0;
         w = 0;
         if (!rst_n) begin
-            cpu_rdata    <= {DATA_WIDTH{1'b0}};
-            wb_valid     <= 1'b0;
-            wb_base_addr <= {ADDR_WIDTH{1'b0}};
-            req_we_q     <= 1'b0;
-            req_wstrb_q  <= 4'b0000;
-            req_addr_q   <= {ADDR_WIDTH{1'b0}};
-            req_wdata_q  <= {DATA_WIDTH{1'b0}};
+            cpu_rdata_q    <= {DATA_WIDTH{1'b0}};
+            hit_rd_valid_q <= 1'b0;
+            hit_way_q      <= 1'b0;
+            hit_word_q     <= 2'd0;
+            wb_valid       <= 1'b0;
+            wb_load_d1     <= 1'b0;
+            wb_base_addr   <= {ADDR_WIDTH{1'b0}};
+            req_we_q       <= 1'b0;
+            req_wstrb_q    <= 4'b0000;
+            req_addr_q     <= {ADDR_WIDTH{1'b0}};
+            req_wdata_q    <= {DATA_WIDTH{1'b0}};
             for (s = 0; s < NUM_SETS; s = s + 1) begin
                 lru_bit[s] <= 1'b0;
                 for (w = 0; w < WAYS; w = w + 1) begin
@@ -211,6 +260,19 @@ module dcache_datapath #(
                 end
             end
         end else begin
+            // Chốt lại dữ liệu Read-Hit từ M10K vào cpu_rdata_q để giữ ổn định ở các chu kỳ sau
+            if (hit_rd_valid_q)
+                cpu_rdata_q <= hit_rdata_mux;
+
+            hit_rd_valid_q <= dp_hit_rd;
+            if (dp_hit_rd) begin
+                hit_way_q  <= hit_way;
+                hit_word_q <= req_word;
+            end
+
+            // Trễ 1 nhịp cho dp_wb_load để đợi đầu ra đồng bộ rdata_q của M10K sẵn sàng
+            wb_load_d1 <= dp_wb_load;
+
             // --- Chốt yêu cầu CPU khi bắt đầu giao dịch nhiều chu kỳ (Miss / Uncached) ---
             if (dp_req_latch) begin
                 req_we_q    <= cpu_we;
@@ -220,9 +282,6 @@ module dcache_datapath #(
             end
 
             // --- Invalidate có điều kiện: chỉ xóa Valid của các dòng Clean (!Dirty) ---
-            // Bảo vệ dữ liệu Dirty chưa ghi trả không bị mất vô tình. Khi thực hiện
-            // CLEAN_INVALIDATE, S_FLUSH đã ghi trả và xóa hết Dirty trước đó nên
-            // bước này sẽ xóa Valid toàn bộ Cache.
             if (dp_inval_all) begin
                 for (s = 0; s < NUM_SETS; s = s + 1) begin
                     for (w = 0; w < WAYS; w = w + 1) begin
@@ -237,37 +296,33 @@ module dcache_datapath #(
             if (dp_hit_rd || dp_hit_wr)
                 lru_bit[req_index] <= ~hit_way;
 
-            if (dp_hit_rd)
-                cpu_rdata <= rd_word_mux;
-
             if (dp_hit_wr)
                 dirty_array[req_index][hit_way] <= 1'b1;
 
-            // --- Đẩy dòng victim Dirty vào Write Buffer ---
+            // --- Đẩy dòng victim Dirty vào Write Buffer (Metadata chốt ngay, Data chốt ở wb_load_d1) ---
             if (dp_wb_load) begin
                 wb_valid     <= 1'b1;
-                wb_base_addr <= {rd_tag_sel, req_index, {OFFSET_BITS{1'b0}}};
+                wb_base_addr <= {tag_array[req_index][victim_way], req_index, {OFFSET_BITS{1'b0}}};
                 dirty_array[req_index][victim_way] <= 1'b0;
             end
 
             if (dp_wb_clear)
                 wb_valid <= 1'b0;
 
-            // --- Refill xong: cập nhật metadata + trả dữ liệu cho CPU ---
+            // --- Trong quá trình Refill: bắt trực tiếp word đọc mà CPU yêu cầu khi từ RAM trả về ---
+            if (dp_refill_we && !eff_we && (word_cnt == req_word))
+                cpu_rdata_q <= mem_rdata;
+
+            // --- Refill xong: cập nhật metadata ---
             if (dp_refill_done) begin
                 valid_array[req_index][saved_victim_way] <= 1'b1;
                 lru_bit[req_index]                       <= ~saved_victim_way;
-                if (eff_we) begin
-                    dirty_array[req_index][saved_victim_way] <= 1'b1;
-                end else begin
-                    cpu_rdata <= refill_req_word;
-                    dirty_array[req_index][saved_victim_way] <= 1'b0;
-                end
+                dirty_array[req_index][saved_victim_way] <= eff_we;
             end
 
             // --- Uncached: trả dữ liệu từ bộ nhớ ---
             if (dp_unc_rdata)
-                cpu_rdata <= mem_rdata;
+                cpu_rdata_q <= mem_rdata;
 
             // --- Flush: dòng đã ghi trả xong ---
             if (dp_flush_clean)
@@ -276,34 +331,21 @@ module dcache_datapath #(
     end
 
     // -------------------------------------------------------------------------
-    // Cập nhật mảng Tag / Data / Write Buffer Data (Đồng bộ thuần theo clk,
-    // hợp nhất 1 địa chỉ ghi (req_index, wr_way) để tối ưu tài nguyên FPGA)
+    // Cập nhật mảng Tag và Write Buffer Data (Đồng bộ thuần theo clk)
     // -------------------------------------------------------------------------
-    wire                  wr_way        = dp_hit_wr ? hit_way : saved_victim_way;
-    wire [DATA_WIDTH-1:0] hit_wr_merged = apply_wstrb(rd_word_mux, cpu_wdata, cpu_wstrb);
-    wire [DATA_WIDTH-1:0] ref_wr_merged = apply_wstrb(refill_req_word, eff_wdata, eff_wstrb);
-
     always @(posedge clk) begin
         k = 0;
-        if (dp_wb_load) begin
-            wb_data[0] <= rd_line_w0;
-            wb_data[1] <= rd_line_w1;
-            wb_data[2] <= rd_line_w2;
-            wb_data[3] <= rd_line_w3;
+        // Sau 1 chu kỳ kể từ dp_wb_load (khi wb_load_d1 == 1), thanh ghi rdata_q của M10K
+        // đã giữ toàn bộ 4 words của dòng victim tại req_index -> nạp vào wb_data[0..3].
+        if (wb_load_d1) begin
+            for (k = 0; k < WORDS_PER_LINE; k = k + 1) begin
+                wb_data[k] <= (saved_victim_way && (WAYS > 1)) ? ram_rdata[WAY1_IDX][k]
+                                                               : ram_rdata[0][k];
+            end
         end
 
-        if (dp_refill_done)
+        if (dp_refill_done) begin
             tag_array[req_index][saved_victim_way] <= req_tag;
-
-        // Cổng ghi hợp nhất trên từng word k của dòng (req_index, wr_way)
-        for (k = 0; k < WORDS_PER_LINE; k = k + 1) begin
-            if (dp_hit_wr && (req_word == k[1:0])) begin
-                data_array[req_index][wr_way][k] <= hit_wr_merged;
-            end else if (dp_refill_done && eff_we && (req_word == k[1:0])) begin
-                data_array[req_index][wr_way][k] <= ref_wr_merged;
-            end else if (dp_refill_we && (word_cnt == k[1:0])) begin
-                data_array[req_index][wr_way][k] <= mem_rdata;
-            end
         end
     end
 
@@ -311,8 +353,6 @@ module dcache_datapath #(
     // Thanh ghi địa chỉ / dữ liệu / byte-enable ghi xuống bộ nhớ
     // -------------------------------------------------------------------------
     always @(posedge clk or negedge rst_n) begin
-        s = 0;
-        w = 0;
         if (!rst_n) begin
             mem_addr  <= {ADDR_WIDTH{1'b0}};
             mem_wdata <= {DATA_WIDTH{1'b0}};
@@ -334,8 +374,8 @@ module dcache_datapath #(
                     mem_wstrb <= 4'b1111;
                 end
                 MS_FLUSH: begin
-                    mem_addr  <= {rd_tag_sel, flush_set, dp_mem_word, 2'b00};
-                    mem_wdata <= rd_word_mux;
+                    mem_addr  <= {tag_array[flush_set][flush_way], flush_set, dp_mem_word, 2'b00};
+                    mem_wdata <= flush_rdata_mux;
                     mem_wstrb <= 4'b1111;
                 end
             endcase

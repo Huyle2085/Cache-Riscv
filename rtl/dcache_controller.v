@@ -98,6 +98,7 @@ module dcache_controller #(
     reg                flush_pending;   // chốt xung cache_flush khi FSM đang bận
     reg                inval_pending;   // chốt xung cache_invalidate khi FSM đang bận
     reg                req_active;      // đang giữ giao dịch Miss/Uncached đã chốt
+    reg                flush_ram_ready; // 1: M10K Data Array đã chốt xong dữ liệu tại flush_set
 
     assign flush_set      = flush_set_cnt[INDEX_BITS-1:0];
     assign dp_use_latched = (state == S_REFILL) || (state == S_UNCACHED);
@@ -127,6 +128,7 @@ module dcache_controller #(
     reg                flush_pending_nxt;
     reg                inval_pending_nxt;
     reg                req_active_nxt;
+    reg                flush_ram_ready_nxt;
     reg                cpu_ready_nxt;
     reg                maint_done_nxt;
     reg                mem_req_nxt;
@@ -174,6 +176,7 @@ module dcache_controller #(
         flush_pending_nxt    = flush_pending | cache_flush;
         inval_pending_nxt    = inval_pending | cache_invalidate;
         req_active_nxt       = req_active;
+        flush_ram_ready_nxt  = flush_ram_ready;
         cpu_ready_nxt        = 1'b0;   // xung 1 chu kỳ
         maint_done_nxt       = 1'b0;   // xung 1 chu kỳ
         mem_req_nxt          = mem_req;
@@ -210,12 +213,13 @@ module dcache_controller #(
                     //     Ưu tiên quét và ghi trả toàn bộ dòng Dirty về RAM trước.
                     //     Nếu đi kèm inval_req (CLEAN_INVALIDATE), inval_pending được giữ lại
                     //     để xóa Valid toàn bộ ngay khi hoàn tất S_FLUSH.
-                    flush_pending_nxt = 1'b0;
-                    flush_set_cnt_nxt = 0;
-                    flush_way_nxt     = 1'b0;
-                    word_cnt_nxt      = 2'd0;
-                    state_nxt         = S_FLUSH;
-                    ev_coherence      = 1'b1;
+                    flush_pending_nxt   = 1'b0;
+                    flush_set_cnt_nxt   = 0;
+                    flush_way_nxt       = 1'b0;
+                    word_cnt_nxt        = 2'd0;
+                    flush_ram_ready_nxt = 1'b0;
+                    state_nxt           = S_FLUSH;
+                    ev_coherence        = 1'b1;
                 end else if (inval_req) begin
                     // 2b. INVALIDATE có điều kiện (1 chu kỳ):
                     //     Xóa Valid của các dòng Clean (!Dirty), bảo vệ dòng Dirty không mất dữ liệu.
@@ -313,32 +317,39 @@ module dcache_controller #(
             // =================================================================
             S_FLUSH: begin
                 ev_coherence = 1'b1;
+                dp_mem_sel   = MS_FLUSH;
                 if (!flush_end) begin
                     if (flush_line_dirty) begin
                         if (!mem_req) begin
-                            // Bắt đầu ghi word hiện tại của dòng Dirty
-                            mem_req_nxt = 1'b1;
-                            mem_we_nxt  = 1'b1;
-                            dp_mem_ld   = 1'b1;
-                            dp_mem_sel  = MS_FLUSH;
-                            dp_mem_word = word_cnt;
+                            if (!flush_ram_ready) begin
+                                // Chu kỳ 0: Cấp địa chỉ flush_set vào M10K Data Array,
+                                // đợi 1 sườn lên clk để thanh ghi đồng bộ của M10K chốt 4 words.
+                                flush_ram_ready_nxt = 1'b1;
+                            end else begin
+                                // Chu kỳ 1: Dữ liệu đồng bộ từ M10K đã sẵn sàng, bắt đầu ghi word 0.
+                                mem_req_nxt = 1'b1;
+                                mem_we_nxt  = 1'b1;
+                                dp_mem_ld   = 1'b1;
+                                dp_mem_word = word_cnt;
+                            end
                         end else if (mem_ready) begin
                             ev_mem_xfer = 1'b1;
                             if (last_word) begin
-                                mem_req_nxt    = 1'b0;
-                                mem_we_nxt     = 1'b0;
-                                dp_flush_clean = 1'b1;
-                                word_cnt_nxt   = 2'd0;
+                                mem_req_nxt         = 1'b0;
+                                mem_we_nxt          = 1'b0;
+                                dp_flush_clean      = 1'b1;
+                                word_cnt_nxt        = 2'd0;
+                                flush_ram_ready_nxt = 1'b0;
                                 flush_advance;
                             end else begin
                                 word_cnt_nxt = word_cnt + 1'b1;
                                 dp_mem_ld    = 1'b1;
-                                dp_mem_sel   = MS_FLUSH;
                                 dp_mem_word  = word_cnt + 1'b1;
                             end
                         end
                     end else begin
                         // Dòng sạch / không hợp lệ: bỏ qua
+                        flush_ram_ready_nxt = 1'b0;
                         flush_advance;
                     end
                 end else begin
@@ -348,8 +359,9 @@ module dcache_controller #(
                         inval_pending_nxt = 1'b0;
                         dp_inval_all      = 1'b1;
                     end
-                    maint_done_nxt = 1'b1;
-                    state_nxt      = S_IDLE;
+                    flush_ram_ready_nxt = 1'b0;
+                    maint_done_nxt      = 1'b1;
+                    state_nxt           = S_IDLE;
                 end
             end
 
@@ -386,6 +398,7 @@ module dcache_controller #(
             flush_pending    <= 1'b0;
             inval_pending    <= 1'b0;
             req_active       <= 1'b0;
+            flush_ram_ready  <= 1'b0;
             cpu_ready        <= 1'b0;
             maint_done       <= 1'b0;
             mem_req          <= 1'b0;
@@ -399,6 +412,7 @@ module dcache_controller #(
             flush_pending    <= flush_pending_nxt;
             inval_pending    <= inval_pending_nxt;
             req_active       <= req_active_nxt;
+            flush_ram_ready  <= flush_ram_ready_nxt;
             cpu_ready        <= cpu_ready_nxt;
             maint_done       <= maint_done_nxt;
             mem_req          <= mem_req_nxt;

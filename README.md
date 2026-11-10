@@ -12,7 +12,7 @@ Dự án thiết kế phần cứng bằng Verilog HDL theo lộ trình **ĐA1 $
 | :--- | :--- |
 | `rtl/riscv_dcache_2way.v` | Top-level D-Cache 2-Way Set-Associative (2 KB, tham số hóa `NUM_SETS`, `WAYS`) |
 | `rtl/dcache_controller.v` | FSM 5 trạng thái (`S_IDLE`, `S_REFILL`, `S_WB_DRAIN`, `S_UNCACHED`, `S_FLUSH`) + Giao thức 2 pha (`cpu_req` / `cpu_req_ready` / `cpu_ready`) |
-| `rtl/dcache_datapath.v` | Mảng `tag_array`, `data_array`, `valid_array`, `dirty_array`, `lru_bit`, Write Buffer 1 dòng và thanh ghi chốt yêu cầu CPU (`req_*_q`) |
+| `rtl/dcache_datapath.v` | `data_array` đồng bộ suy diễn **M10K Block RAM** (Dual-Port, byte-enable), `tag_array`, `valid_array`, `dirty_array`, `lru_bit`, Write Buffer 1 dòng và thanh ghi chốt yêu cầu CPU (`req_*_q`) |
 | `rtl/dcache_req_rsp_adapter.v` | Bộ chuyển đổi chuẩn hóa giao thức 2 pha độc lập (`req_valid`/`req_ready` & `rsp_valid`/`rsp_rdata`) có Skid Buffer nhận yêu cầu mới ngay trong chu kỳ `rsp_valid = 1` |
 | `rtl/dcache_perf_counters.v` | 5 bộ đếm hiệu năng phần cứng 32-bit (`cnt_accesses`, `cnt_misses`, `cnt_stall_cycles`, `cnt_mem_traffic`, `cnt_coherence_cyc`) |
 | `rtl/riscv_core_rv32i.v` | Lõi RISC-V RV32I Pipeline 5 tầng (`IF-ID-EX-MEM-WB`) có Forwarding, Hazard Detection và IF Skid Buffer cho M10K Synchronous IMEM |
@@ -57,17 +57,30 @@ Dự án thiết kế phần cứng bằng Verilog HDL theo lộ trình **ĐA1 $
 
 ## 4. Kết quả Tổng hợp Phần cứng trên FPGA DE10-Standard (`Cyclone V 5CSXFC6D6F31C6`)
 
-Tổng hợp bằng **Quartus II 64-Bit Analysis & Synthesis**:
+Tổng hợp thực tế bằng **Quartus II 64-Bit Analysis & Synthesis (`quartus_map`)** sau khi chuyển cả `imem` và `data_array` sang kiến trúc bộ nhớ đồng bộ suy diễn **M10K Block RAM (`altsyncram` / `cyclonev_ram_block`)**:
+
+### 4.1. Bảng phân bổ tài nguyên theo phân cấp (Hierarchy Utilization)
 
 | Khối phân cấp (Entity) | Combinational ALUTs | Dedicated Registers | Block Memory Bits (M10K) |
 | :--- | :---: | :---: | :---: |
-| **`riscv_cache_soc` (Toàn SoC)** | **11,317** *(15,573 ALMs / 37.2%)* | **21,462** *(12.9%)* | **8,192 bits (1 M10K)** |
-| ├── `altsyncram:imem_rtl_0` (`imem`) | 0 | 0 | **8,192 bits (1 M10K ROM)** |
-| ├── `riscv_core_rv32i:u_core` | 1,740 | 1,439 | 0 |
-| └── `riscv_dcache_2way:u_dcache` | 9,576 | 20,023 | 0 |
-| &nbsp;&nbsp;&nbsp;&nbsp;├── `dcache_controller:u_ctrl` | 81 | 21 | 0 |
-| &nbsp;&nbsp;&nbsp;&nbsp;├── `dcache_datapath:u_dp` | 9,335 | 19,842 | 0 |
+| **`riscv_cache_soc` (Toàn SoC)** | **6,753** *(6,067 ALMs / 14.5%)* | **5,084** *(3.0%)* | **24,576 bits (33 M10K blocks)** |
+| ├── `altsyncram:imem_rtl_0` (`imem`) | 0 | 0 | **8,192 bits (1 KB ROM)** |
+| ├── `riscv_core_rv32i:u_core` | 1,811 | 1,439 | 0 |
+| └── `riscv_dcache_2way:u_dcache` | 4,941 | 3,645 | **16,384 bits (2 KB Dual-Port RAM)** |
+| &nbsp;&nbsp;&nbsp;&nbsp;├── `dcache_controller:u_ctrl` | 85 | 22 | 0 |
+| &nbsp;&nbsp;&nbsp;&nbsp;├── `dcache_datapath:u_dp` | 4,696 | 3,463 | **16,384 bits (32 $\times$ 512-bit `altsyncram`)** |
 | &nbsp;&nbsp;&nbsp;&nbsp;└── `dcache_perf_counters:u_perf` | 160 | 160 | 0 |
+
+### 4.2. So sánh Trước và Sau khi chuyển `data_array` sang M10K Block RAM
+
+| Chỉ số tổng hợp (`Cyclone V 5CSXFC6D6F31C6`) | Trước (`data_array` bằng FF/LUT) | Sau (`data_array` suy diễn M10K) | Mức cải thiện |
+| :--- | :---: | :---: | :---: |
+| **Ước lượng ALMs (`ALMs needed`)** | 15,573 / 41,910 (37.2%) | **6,067 / 41,910 (14.5%)** | **-61.0% ALMs** |
+| **Combinational ALUTs (`riscv_cache_soc`)** | 11,317 | **6,753** | **-40.3% ALUTs** |
+| **Dedicated Logic Registers (`riscv_cache_soc`)** | 21,462 | **5,084** | **-76.3% Registers (-16,378 FFs)** |
+| **Riêng `dcache_datapath` (ALUTs / Registers)** | 9,335 ALUTs / 19,842 FFs | **4,696 ALUTs / 3,463 FFs** | **-49.7% ALUTs / -82.5% FFs** |
+| **Block Memory Bits (M10K)** | 8,192 bits (`imem` only) | **24,576 bits (`imem` + `data_array`)** | **100% `data_array` (16,384 bits) vào M10K** |
+| **Thời gian chạy `quartus_map`** | 49 giây | **26 giây** | **Nhanh hơn 1.88x** |
 
 ---
 
@@ -77,9 +90,9 @@ Tổng hợp bằng **Quartus II 64-Bit Analysis & Synthesis**:
 # 1. Biên dịch toàn bộ RTL và Testbench
 C:\altera\13.0sp1\modelsim_ase\win32aloem\vlog.exe -work work rtl/dcache_perf_counters.v rtl/dcache_controller.v rtl/dcache_datapath.v rtl/riscv_dcache_2way.v rtl/dcache_req_rsp_adapter.v rtl/riscv_core_rv32i.v rtl/riscv_cache_soc.v tb/var_latency_mem.v tb/tb_riscv_dcache_2way.v tb/tb_riscv_cache_soc.v
 
-# 2. Chạy kiểm thử D-Cache 2-Way độc lập (35/35 PASS + 905 Protocol Assertions)
+# 2. Chạy kiểm thử D-Cache 2-Way độc lập (35/35 PASS + 897 Protocol Assertions)
 C:\altera\13.0sp1\modelsim_ase\win32aloem\vsim.exe -c -do "run -all; quit -f" work.tb_riscv_dcache_2way
 
-# 3. Chạy kiểm thử SoC RISC-V + D-Cache 2-Way chạy C (17/17 PASS + 11,076 Protocol Assertions)
+# 3. Chạy kiểm thử SoC RISC-V + D-Cache 2-Way chạy C (17/17 PASS + 11,023 Protocol Assertions)
 C:\altera\13.0sp1\modelsim_ase\win32aloem\vsim.exe -c -do "run -all; quit -f" work.tb_riscv_cache_soc
 ```

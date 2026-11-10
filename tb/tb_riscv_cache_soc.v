@@ -592,14 +592,26 @@ module tb_riscv_cache_soc;
         check_val(u_mem_2w.ram[14'h0243], 32'd440,
                   "Test 6: LRU Chieu 2 (Evict Way 1 -> WB -> RAM) B[3]=440");
 
-        // 4. Kiểm tra các dòng đang giữ trong Set 16 và Set 17 của D-Cache 2-Way
-        check_val(u_soc_2w.u_dcache.u_dp.data_array[16][0][0], 32'd111,
+        // 4. Kiểm tra các dòng đang giữ trong Set 16, 17, 48 của M10K Data Array (D-Cache 2-Way)
+        check_val({u_soc_2w.u_dcache.u_dp.gen_way[0].gen_word[0].bank_b3[16],
+                   u_soc_2w.u_dcache.u_dp.gen_way[0].gen_word[0].bank_b2[16],
+                   u_soc_2w.u_dcache.u_dp.gen_way[0].gen_word[0].bank_b1[16],
+                   u_soc_2w.u_dcache.u_dp.gen_way[0].gen_word[0].bank_b0[16]}, 32'd111,
                   "Test 7: Set 16 Way 0 giu nguyen C[0]=111 khi Way 1 bi da");
-        check_val(u_soc_2w.u_dcache.u_dp.data_array[16][1][0], 32'd1111,
+        check_val({u_soc_2w.u_dcache.u_dp.gen_way[1].gen_word[0].bank_b3[16],
+                   u_soc_2w.u_dcache.u_dp.gen_way[1].gen_word[0].bank_b2[16],
+                   u_soc_2w.u_dcache.u_dp.gen_way[1].gen_word[0].bank_b1[16],
+                   u_soc_2w.u_dcache.u_dp.gen_way[1].gen_word[0].bank_b0[16]}, 32'd1111,
                   "Test 8: Set 16 Way 1 nap dung D[0]=1111 sau khi da B[0]");
-        check_val(u_soc_2w.u_dcache.u_dp.data_array[17][1][3], 32'd880,
+        check_val({u_soc_2w.u_dcache.u_dp.gen_way[1].gen_word[3].bank_b3[17],
+                   u_soc_2w.u_dcache.u_dp.gen_way[1].gen_word[3].bank_b2[17],
+                   u_soc_2w.u_dcache.u_dp.gen_way[1].gen_word[3].bank_b1[17],
+                   u_soc_2w.u_dcache.u_dp.gen_way[1].gen_word[3].bank_b0[17]}, 32'd880,
                   "Test 9: Set 17 Way 1 giu nguyen B[7]=880 (Dirty)       ");
-        check_val(u_soc_2w.u_dcache.u_dp.data_array[48][0][2], 32'hCAFE_0001,
+        check_val({u_soc_2w.u_dcache.u_dp.gen_way[0].gen_word[2].bank_b3[48],
+                   u_soc_2w.u_dcache.u_dp.gen_way[0].gen_word[2].bank_b2[48],
+                   u_soc_2w.u_dcache.u_dp.gen_way[0].gen_word[2].bank_b1[48],
+                   u_soc_2w.u_dcache.u_dp.gen_way[0].gen_word[2].bank_b0[48]}, 32'hCAFE_0001,
                   "Test 10: D-Cache RESULT[2] = status (0xCAFE0001)       ");
 
         // 5. Kiểm tra kết quả chương trình C trên SoC Direct-Mapped 1 KB (DM-1K) và 2 KB (DM-2K)
