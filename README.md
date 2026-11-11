@@ -17,12 +17,16 @@ Dự án thiết kế phần cứng bằng Verilog HDL theo lộ trình **ĐA1 $
 | `rtl/dcache_perf_counters.v` | 5 bộ đếm hiệu năng phần cứng 32-bit (`cnt_accesses`, `cnt_misses`, `cnt_stall_cycles`, `cnt_mem_traffic`, `cnt_coherence_cyc`) |
 | `rtl/riscv_core_rv32i.v` | Lõi RISC-V RV32I Pipeline 5 tầng (`IF-ID-EX-MEM-WB`) có Forwarding, Hazard Detection và IF Skid Buffer cho M10K Synchronous IMEM |
 | `rtl/riscv_cache_soc.v` | Top-level SoC tích hợp Lõi RV32I + Bộ nhớ lệnh đồng bộ M10K (`imem`) + D-Cache 2-Way |
-| `sw/benchmark_da2.c` | Chương trình C đánh giá hiệu năng Thrashing 2 chiều LRU & Byte/Halfword Strobe |
-| `sw/start.S`, `sw/program.hex` | Mã khởi động Assembly và mã máy RV32I nạp vào `imem` |
+| `sw/benchmark_da2.c` | Benchmark 1: Chương trình C đánh giá hiệu năng Thrashing 2 chiều LRU & Byte/Halfword Strobe |
+| `sw/benchmark_seq.c` | Benchmark 2: Chương trình C đánh giá tải tuần tự & ít xung đột (Spatial & Temporal Locality) |
+| `sw/start.S`, `sw/link.ld` | Mã khởi động C Runtime (`crt0`) gọi `jal ra, main` và Linker Script cho `riscv64-unknown-elf-gcc` |
+| `sw/build_sw.sh`, `sw/bin2hex.py` | Script tự động biên dịch `C -> ELF -> BIN -> HEX` bằng RISC-V GCC (`-march=rv32i -mabi=ilp32 -O2`) |
+| `sw/program.hex`, `sw/program_seq.hex` | Các file mã máy RV32I xuất trực tiếp từ `benchmark_da2.elf` và `benchmark_seq.elf` |
 | `tb/var_latency_mem.v` | Mô hình RAM độ trễ biến thiên (LFSR) kèm bộ giải mã địa chỉ SoC 4 vùng không alias |
 | `tb/tb_riscv_dcache_2way.v` | Testbench kiểm chứng D-Cache 2-Way độc lập (35 bài test định hướng + Protocol Assertions) |
-| `tb/tb_riscv_cache_soc.v` | Testbench toàn hệ thống SoC chạy C, đối sánh công bằng `DM-1K` / `DM-2K` / `2W-2K` và Random Stress Test (600 giao dịch $\times$ 3 seeds) |
+| `tb/tb_riscv_cache_soc.v` | Testbench toàn hệ thống SoC chạy cả 2 Benchmark C (20/20 PASS), đối sánh `DM-1K` / `DM-2K` / `2W-2K` và Random Stress Test |
 | `quartus/riscv_cache_soc.qsf` | Cấu hình tổng hợp Quartus II cho FPGA DE10-Standard (`Cyclone V 5CSXFC6D6F31C6`) |
+| `BAO_CAO_DA2.md` | Báo cáo kỹ thuật hoàn chỉnh của Đồ án 2 (Kiến trúc, FSM, Giao thức, LRU/WB, Benchmark, PPA & Giới hạn) |
 | `minimal/` | Mô hình Cache Direct-Mapped tối giản của giai đoạn ĐA1 |
 
 ---
@@ -38,20 +42,37 @@ Dự án thiết kế phần cứng bằng Verilog HDL theo lộ trình **ĐA1 $
 
 ---
 
-## 3. Kết quả Đối sánh Hiệu năng trên Chương trình C (`tb_riscv_cache_soc`)
+## 3. Kết quả Đối sánh Hiệu năng trên 2 Chương trình C Biên dịch bằng RISC-V GCC (`tb_riscv_cache_soc`)
+
+### 3.1. Benchmark 1 (`sw/benchmark_da2.c` — Workload Xung đột Cao / Thrashing)
 
 | Chỉ tiêu đánh giá | DM-1K (64S, 1W, 1 KB) | DM-2K (128S, 1W, 2 KB) | 2W-2K (64S, 2W, 2 KB) | Cải thiện (2W-2K vs DM-2K) |
 | :--- | :---: | :---: | :---: | :---: |
-| Tổng số lệnh RV32I hoàn tất | 257 instrs | 257 instrs | 257 instrs | — |
+| Tổng số lệnh RV32I hoàn tất (GCC `-O2`) | 144 instrs | 144 instrs | 144 instrs | — |
 | Tổng truy cập D-Cache | 60 accesses | 60 accesses | 60 accesses | — |
 | Số lần Cache Hit | 23 hits | 23 hits | **51 hits** | **+28 hits** |
 | Số lần Cache Miss | 37 misses | 37 misses | **9 misses** | **-75.7%** |
 | **Miss Rate** | 61.67% | 61.67% | **15.00%** | **-46.67%** |
-| **Stall Cycles** | 1,283 cycles | 1,283 cycles | **244 cycles** | **-81.0%** |
-| **AMAT (cycles/access)** | 22.38 | 22.38 | **5.07** | **-77.4% (nhanh hơn 4.42x)** |
-| **Tổng chu kỳ CPU** | 1,602 cycles | 1,602 cycles | **563 cycles** | **-64.9%** |
-| **CPI (Cycles / Instr)** | 6.23 | 6.23 | **2.19** | **-64.9%** |
+| **Stall Cycles** | 1,354 cycles | 1,354 cycles | **263 cycles** | **-80.6%** |
+| **AMAT (cycles/access)** | 23.57 | 23.57 | **5.38** | **-77.2% (nhanh hơn 4.38x)** |
+| **Tổng chu kỳ CPU** | 1,532 cycles | 1,532 cycles | **441 cycles** | **-71.2% (nhanh hơn 3.47x)** |
+| **CPI (Cycles / Instr)** | 10.64 | 10.64 | **3.06** | **-71.2%** |
 | **Memory Traffic** | 248W (992 B) | 248W (992 B) | **48W (192 B)** | **-80.6%** |
+
+### 3.2. Benchmark 2 (`sw/benchmark_seq.c` — Workload Tuần tự / Ít Xung đột)
+
+| Chỉ tiêu đánh giá | DM-1K (64S, 1W, 1 KB) | DM-2K (128S, 1W, 2 KB) | 2W-2K (64S, 2W, 2 KB) | Nhận xét Khách quan |
+| :--- | :---: | :---: | :---: | :--- |
+| Tổng số lệnh RV32I hoàn tất (GCC `-O2`) | 323 instrs | 323 instrs | 323 instrs | — |
+| Tổng truy cập D-Cache | 115 accesses | 115 accesses | 115 accesses | — |
+| Số lần Cache Hit | **102 hits** | **102 hits** | **102 hits** | **88.70% Hit Rate** trên cả 3 mô hình |
+| Số lần Cache Miss | **13 misses** | **13 misses** | **13 misses** | 100% là Cold Miss, **0 Conflict Miss** |
+| **Miss Rate** | **11.30%** | **11.30%** | **11.30%** | Cả Direct-Mapped và 2-Way đều tối ưu |
+| **Stall Cycles** | 289 cycles | 289 cycles | 289 cycles | Ngang nhau (0.0%) |
+| **AMAT (cycles/access)** | **3.51** | **3.51** | **3.51** | Ngang nhau (1.00x) |
+| **Tổng chu kỳ CPU** | 758 cycles | 758 cycles | 758 cycles | Ngang nhau (0.0%) |
+| **CPI (Cycles / Instr)** | **2.35** | **2.35** | **2.35** | Ngang nhau (0.0%) |
+| **Memory Traffic** | 52W (208 B) | 52W (208 B) | 52W (208 B) | $13 \times 4 = 52\text{ words}$ |
 
 ---
 
@@ -84,15 +105,18 @@ Tổng hợp thực tế bằng **Quartus II 64-Bit Analysis & Synthesis (`quart
 
 ---
 
-## 5. Hướng dẫn Chạy Mô phỏng (ModelSim)
+## 5. Hướng dẫn Biên dịch C (`RISC-V GCC`) & Chạy Mô phỏng (`ModelSim`)
 
 ```powershell
+# 0. Biên dịch chương trình C (benchmark_da2.c & benchmark_seq.c) -> ELF -> HEX bằng RISC-V GCC (WSL)
+wsl -- bash sw/build_sw.sh
+
 # 1. Biên dịch toàn bộ RTL và Testbench
 C:\altera\13.0sp1\modelsim_ase\win32aloem\vlog.exe -work work rtl/dcache_perf_counters.v rtl/dcache_controller.v rtl/dcache_datapath.v rtl/riscv_dcache_2way.v rtl/dcache_req_rsp_adapter.v rtl/riscv_core_rv32i.v rtl/riscv_cache_soc.v tb/var_latency_mem.v tb/tb_riscv_dcache_2way.v tb/tb_riscv_cache_soc.v
 
 # 2. Chạy kiểm thử D-Cache 2-Way độc lập (35/35 PASS + 897 Protocol Assertions)
 C:\altera\13.0sp1\modelsim_ase\win32aloem\vsim.exe -c -do "run -all; quit -f" work.tb_riscv_dcache_2way
 
-# 3. Chạy kiểm thử SoC RISC-V + D-Cache 2-Way chạy C (17/17 PASS + 11,023 Protocol Assertions)
+# 3. Chạy kiểm thử SoC RISC-V + D-Cache 2-Way chạy 2 Benchmark C (20/20 PASS + 11,022 Protocol Assertions)
 C:\altera\13.0sp1\modelsim_ase\win32aloem\vsim.exe -c -do "run -all; quit -f" work.tb_riscv_cache_soc
 ```

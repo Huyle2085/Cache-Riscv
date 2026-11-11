@@ -80,10 +80,10 @@ int main(void) {
     *((volatile uint8_t  *)0x00000203) = 0xBE;
     uint32_t packed = ADDR_BYTE_TEST[0]; /* Kỳ vọng: 0xBEEF1234 */
 
-    /* 6. Xuất kết quả ra bộ nhớ để Testbench đối chiếu */
+    /* 6. Xuất kết quả ra bộ nhớ để Testbench đối chiếu và trả về sum qua a0 */
     ADDR_RESULT[0] = (uint32_t)sum;    /* 0x00000300: 0x00000F78 (3960) */
     ADDR_RESULT[1] = packed;           /* 0x00000304: 0xBEEF1234        */
     ADDR_RESULT[2] = 0xCAFE0001u;      /* 0x00000308: Cờ báo hoàn tất   */
 
-    return 0;
+    return sum;
 }

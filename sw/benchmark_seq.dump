@@ -1,0 +1,47 @@
+
+sw/benchmark_seq.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00000000 <_start>:
+   0:	00004137          	lui	sp,0x4
+   4:	008000ef          	jal	ra,c <main>
+   8:	00100073          	ebreak
+
+0000000c <main>:
+   c:	40000713          	addi	a4,zero,1024
+  10:	00a00693          	addi	a3,zero,10
+  14:	00100793          	addi	a5,zero,1
+  18:	01100613          	addi	a2,zero,17
+  1c:	00f72023          	sw	a5,0(a4)
+  20:	04d72023          	sw	a3,64(a4)
+  24:	00178793          	addi	a5,a5,1
+  28:	00a68693          	addi	a3,a3,10
+  2c:	00470713          	addi	a4,a4,4
+  30:	fec796e3          	bne	a5,a2,1c <main+0x10>
+  34:	40000793          	addi	a5,zero,1024
+  38:	00000513          	addi	a0,zero,0
+  3c:	44000613          	addi	a2,zero,1088
+  40:	0007a703          	lw	a4,0(a5)
+  44:	0407a683          	lw	a3,64(a5)
+  48:	00478793          	addi	a5,a5,4
+  4c:	00d70733          	add	a4,a4,a3
+  50:	06e7ae23          	sw	a4,124(a5)
+  54:	00e50533          	add	a0,a0,a4
+  58:	fec794e3          	bne	a5,a2,40 <main+0x34>
+  5c:	48000793          	addi	a5,zero,1152
+  60:	00000693          	addi	a3,zero,0
+  64:	4c000593          	addi	a1,zero,1216
+  68:	0007a703          	lw	a4,0(a5)
+  6c:	f807a603          	lw	a2,-128(a5)
+  70:	00478793          	addi	a5,a5,4
+  74:	40c70733          	sub	a4,a4,a2
+  78:	00e686b3          	add	a3,a3,a4
+  7c:	feb796e3          	bne	a5,a1,68 <main+0x5c>
+  80:	30a02023          	sw	a0,768(zero) # 300 <main+0x2f4>
+  84:	cafe07b7          	lui	a5,0xcafe0
+  88:	30d02223          	sw	a3,772(zero) # 304 <main+0x2f8>
+  8c:	00278793          	addi	a5,a5,2 # cafe0002 <main+0xcafdfff6>
+  90:	30f02423          	sw	a5,776(zero) # 308 <main+0x2fc>
+  94:	00008067          	jalr	zero,0(ra)

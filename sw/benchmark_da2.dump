@@ -1,0 +1,97 @@
+
+sw/benchmark_da2.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00000000 <_start>:
+   0:	00004137          	lui	sp,0x4
+   4:	008000ef          	jal	ra,c <main>
+   8:	00100073          	ebreak
+
+0000000c <main>:
+   c:	00a00793          	addi	a5,zero,10
+  10:	10f02023          	sw	a5,256(zero) # 100 <main+0xf4>
+  14:	06400713          	addi	a4,zero,100
+  18:	000017b7          	lui	a5,0x1
+  1c:	90e7a023          	sw	a4,-1792(a5) # 900 <main+0x8f4>
+  20:	01400713          	addi	a4,zero,20
+  24:	10e02223          	sw	a4,260(zero) # 104 <main+0xf8>
+  28:	0c800713          	addi	a4,zero,200
+  2c:	90e7a223          	sw	a4,-1788(a5)
+  30:	01e00713          	addi	a4,zero,30
+  34:	10e02423          	sw	a4,264(zero) # 108 <main+0xfc>
+  38:	12c00713          	addi	a4,zero,300
+  3c:	90e7a423          	sw	a4,-1784(a5)
+  40:	02800713          	addi	a4,zero,40
+  44:	10e02623          	sw	a4,268(zero) # 10c <main+0x100>
+  48:	19000713          	addi	a4,zero,400
+  4c:	90e7a623          	sw	a4,-1780(a5)
+  50:	03200713          	addi	a4,zero,50
+  54:	10e02823          	sw	a4,272(zero) # 110 <main+0x104>
+  58:	1f400713          	addi	a4,zero,500
+  5c:	90e7a823          	sw	a4,-1776(a5)
+  60:	03c00713          	addi	a4,zero,60
+  64:	10e02a23          	sw	a4,276(zero) # 114 <main+0x108>
+  68:	25800713          	addi	a4,zero,600
+  6c:	90e7aa23          	sw	a4,-1772(a5)
+  70:	04600713          	addi	a4,zero,70
+  74:	10e02c23          	sw	a4,280(zero) # 118 <main+0x10c>
+  78:	2bc00713          	addi	a4,zero,700
+  7c:	90e7ac23          	sw	a4,-1768(a5)
+  80:	05000713          	addi	a4,zero,80
+  84:	10e02e23          	sw	a4,284(zero) # 11c <main+0x110>
+  88:	00001637          	lui	a2,0x1
+  8c:	32000713          	addi	a4,zero,800
+  90:	90e7ae23          	sw	a4,-1764(a5)
+  94:	00000513          	addi	a0,zero,0
+  98:	10000793          	addi	a5,zero,256
+  9c:	80060893          	addi	a7,a2,-2048 # 800 <main+0x7f4>
+  a0:	12000813          	addi	a6,zero,288
+  a4:	011786b3          	add	a3,a5,a7
+  a8:	0007a703          	lw	a4,0(a5)
+  ac:	0006a583          	lw	a1,0(a3)
+  b0:	00478793          	addi	a5,a5,4
+  b4:	00b70733          	add	a4,a4,a1
+  b8:	00e6a023          	sw	a4,0(a3)
+  bc:	00e50533          	add	a0,a0,a4
+  c0:	ff0792e3          	bne	a5,a6,a4 <main+0x98>
+  c4:	06f00793          	addi	a5,zero,111
+  c8:	10f62023          	sw	a5,256(a2)
+  cc:	0de00793          	addi	a5,zero,222
+  d0:	10f62223          	sw	a5,260(a2)
+  d4:	14d00793          	addi	a5,zero,333
+  d8:	10f62423          	sw	a5,264(a2)
+  dc:	1bc00793          	addi	a5,zero,444
+  e0:	10f62623          	sw	a5,268(a2)
+  e4:	22b00793          	addi	a5,zero,555
+  e8:	10f62823          	sw	a5,272(a2)
+  ec:	29a00793          	addi	a5,zero,666
+  f0:	10f62a23          	sw	a5,276(a2)
+  f4:	30900793          	addi	a5,zero,777
+  f8:	10f62c23          	sw	a5,280(a2)
+  fc:	37800793          	addi	a5,zero,888
+ 100:	10f62e23          	sw	a5,284(a2)
+ 104:	45700713          	addi	a4,zero,1111
+ 108:	000027b7          	lui	a5,0x2
+ 10c:	90e7a023          	sw	a4,-1792(a5) # 1900 <main+0x18f4>
+ 110:	8ae60713          	addi	a4,a2,-1874
+ 114:	90e7a223          	sw	a4,-1788(a5)
+ 118:	d0560713          	addi	a4,a2,-763
+ 11c:	90e7a423          	sw	a4,-1784(a5)
+ 120:	15c60713          	addi	a4,a2,348
+ 124:	90e7a623          	sw	a4,-1780(a5)
+ 128:	20002023          	sw	zero,512(zero) # 200 <main+0x1f4>
+ 12c:	23460613          	addi	a2,a2,564
+ 130:	20c01023          	sh	a2,512(zero) # 200 <main+0x1f4>
+ 134:	fef00793          	addi	a5,zero,-17
+ 138:	20f00123          	sb	a5,514(zero) # 202 <main+0x1f6>
+ 13c:	fbe00793          	addi	a5,zero,-66
+ 140:	20f001a3          	sb	a5,515(zero) # 203 <main+0x1f7>
+ 144:	20002783          	lw	a5,512(zero) # 200 <main+0x1f4>
+ 148:	30a02023          	sw	a0,768(zero) # 300 <main+0x2f4>
+ 14c:	30f02223          	sw	a5,772(zero) # 304 <main+0x2f8>
+ 150:	cafe07b7          	lui	a5,0xcafe0
+ 154:	00178793          	addi	a5,a5,1 # cafe0001 <main+0xcafdfff5>
+ 158:	30f02423          	sw	a5,776(zero) # 308 <main+0x2fc>
+ 15c:	00008067          	jalr	zero,0(ra)

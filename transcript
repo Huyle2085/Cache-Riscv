@@ -11,9 +11,10 @@
 # ================================================================================
 #  PHAN 1: KIEM CHUNG CORE RISC-V PIPELINE 5 TANG + D-CACHE 2-WAY CHAY C (DA2)
 # ================================================================================
-# [INFO] Chuong trinh C (sw/benchmark_da2.c) da hoan tat (257 lenh RV32I retired).
-# [PASS] Test 1: Core RISC-V tinh sum = Sigma(A[i]+B[i]) = 3960 | Got: 0x00000f78
-# [PASS] Test 2: Core RISC-V SH/SB/LW Byte-Strobe (0xBEEF1234)  | Got: 0xbeef1234
+# [INFO] Benchmark 1 (sw/benchmark_da2.c -> GCC ELF -> program.hex) hoan tat (144 lenh RV32I retired).
+# [INFO] Benchmark 2 (sw/benchmark_seq.c -> GCC ELF -> program_seq.hex) hoan tat (323 lenh RV32I retired).
+# [PASS] Test 1: Core RISC-V (GCC ELF) return a0 = sum = 3960     | Got: 0x00000f78
+# [PASS] Test 2: Core RISC-V SH/SB/LW RESULT[1] (0xBEEF1234)     | Got: 0xbeef1234
 # [PASS] Test 3: LRU Chieu 1 (Evict Way 0 -> WB -> RAM) A[0]=10 | Got: 0x0000000a
 # [PASS] Test 4: LRU Chieu 1 (Evict Way 0 -> WB -> RAM) A[7]=80 | Got: 0x00000050
 # [PASS] Test 5: LRU Chieu 2 (Evict Way 1 -> WB -> RAM) B[0]=110 | Got: 0x0000006e
@@ -24,6 +25,9 @@
 # [PASS] Test 10: D-Cache RESULT[2] = status (0xCAFE0001)        | Got: 0xcafe0001
 # [PASS] Test 11a: SoC Direct-Mapped 1KB (DM-1K) tinh dung sum=3960 | Got: 0x00000f78
 # [PASS] Test 11b: SoC Direct-Mapped 2KB (DM-2K) tinh dung sum=3960 | Got: 0x00000f78
+# [PASS] Test 11c [Seq Bench]: 2W-2K tinh dung sum_z = 1496 (0x5D8) | Got: 0x000005d8
+# [PASS] Test 11d [Seq Bench]: 2W-2K tinh dung filter_acc = 1360   | Got: 0x00000550
+# [PASS] Test 11e [Seq Bench]: DM-1K & DM-2K tinh dung sum_z = 1496 | Got: 0x000005d8
 # ================================================================================
 #  PHAN 2: KIEM THU CORNER CASES & RANDOM STRESS TEST (3 SEEDS x 200 GIAO DICH)
 # ================================================================================
@@ -32,41 +36,56 @@
 # [PASS] Test 14 [Corner Case]: Back-to-Back Dirty Evict & Reload      | Got: 0xabcda55a
 # [COVERAGE] Set 8: 160 | Set 9: 150 | Set 10: 149 | Set 11: 141 txns
 # [COVERAGE] Tag 0: 159 | Tag 1: 150 | Tag 2 : 149 | Tag 3 : 142 txns
-# [ASSERTIONS] 15 Random Maintenance ops (T17) & 11023 Protocol Assertions PASSED
+# [ASSERTIONS] 15 Random Maintenance ops (T17) & 11022 Protocol Assertions PASSED
 # [PASS] st 15 [Random Stress + T17 Maint]: 600 Txns + 15 Maint vs Golden | Got: 0x00000000
 # [PASS] Test 16 [Coverage]: Do bao phu du 100%% cac Set 8..11 & Tag 0..3 | Got: 0x00000001
 # =====================================================================================================
-#  PHAN 3: BANG DOI CHUNG CONG BANG DM-1K (1KB), DM-2K (2KB) VA 2W-2K (2KB) TREN CUNG CHUONG TRINH C
+#  PHAN 3A: DOI SANH TREN BENCHMARK 1 (sw/benchmark_da2.c - WORKLOAD XUNG DOT / THRASHING)
 # =====================================================================================================
 #  Chi tieu danh gia        | DM-1K (64S,1W,1KB) | DM-2K (128S,1W,2KB)| 2W-2K (64S,2W,2KB) | 2W-2K vs DM-2K
 # --------------------------+--------------------+--------------------+--------------------+---------------
-#  Tong so lenh RV32I       |         257 instrs |         257 instrs |         257 instrs |       -
+#  Tong so lenh RV32I       |         144 instrs |         144 instrs |         144 instrs |       -
 #  Tong truy cap D-Cache    |        60 accesses |        60 accesses |        60 accesses |       -
 #  So lan Cache Hit         |            23 hits |            23 hits |            51 hits | +28 hits
 #  So lan Cache Miss        |          37 misses |          37 misses |           9 misses | -75.7 %
 #  Miss Rate                |            61.67 % |            61.67 % |            15.00 % | -46.67 %
-#  Stall Cycles             |        1283 cycles |        1283 cycles |         244 cycles | -81.0 %
-#  AMAT (cycles/access)     |              22.38 |              22.38 |               5.07 | -77.4 % (4.42x)
-#  Tong chu ky CPU (Cycles) |        1602 cycles |        1602 cycles |         563 cycles | -64.9 %
-#  CPI (Cycles / Instr)     |               6.23 |               6.23 |               2.19 | -64.9 %
+#  Stall Cycles             |        1354 cycles |        1354 cycles |         263 cycles | -80.6 %
+#  AMAT (cycles/access)     |              23.57 |              23.57 |               5.38 | -77.2 % (4.38x)
+#  Tong chu ky CPU (Cycles) |        1532 cycles |        1532 cycles |         441 cycles | -71.2 %
+#  CPI (Cycles / Instr)     |              10.64 |              10.64 |               3.06 | -71.2 %
 #  Memory Traffic           |      248W ( 992B) |      248W ( 992B) |       48W ( 192B) | -80.6 %
+# =====================================================================================================
+#  PHAN 3B: DOI SANH TREN BENCHMARK 2 (sw/benchmark_seq.c - WORKLOAD TUAN TU / IT XUNG DOT)
+# =====================================================================================================
+#  Chi tieu danh gia        | DM-1K (64S,1W,1KB) | DM-2K (128S,1W,2KB)| 2W-2K (64S,2W,2KB) | 2W-2K vs DM-2K
+# --------------------------+--------------------+--------------------+--------------------+---------------
+#  Tong so lenh RV32I       |         323 instrs |         323 instrs |         323 instrs |       -
+#  Tong truy cap D-Cache    |       115 accesses |       115 accesses |       115 accesses |       -
+#  So lan Cache Hit         |           102 hits |           102 hits |           102 hits | +0 hits
+#  So lan Cache Miss        |          13 misses |          13 misses |          13 misses | -0.0 %
+#  Miss Rate                |            11.30 % |            11.30 % |            11.30 % | -0.00 %
+#  Stall Cycles             |         289 cycles |         289 cycles |         289 cycles | -0.0 %
+#  AMAT (cycles/access)     |               3.51 |               3.51 |               3.51 | -0.0 % (1.00x)
+#  Tong chu ky CPU (Cycles) |         758 cycles |         758 cycles |         758 cycles | -0.0 %
+#  CPI (Cycles / Instr)     |               2.35 |               2.35 |               2.35 | -0.0 %
+#  Memory Traffic           |       52W ( 208B) |       52W ( 208B) |       52W ( 208B) | -0.0 %
 # =====================================================================================================
 #  PHAN 4: BANG CHUNG DO TRE RAM BIEN THIEN (LFSR) & KHAO SAT THAY DOI RAM LATENCY
 # =====================================================================================================
 #  [1] Phan bo do tre RAM bien thien (2..5 chu ky) tren SoC 2-Way (48 word xfers):
-#      + Do tre 2 chu ky : 8 lan
-#      + Do tre 3 chu ky : 15 lan
-#      + Do tre 4 chu ky : 17 lan
-#      + Do tre 5 chu ky : 8 lan
-#      => Do tre RAM trung binh thuc nghiem: 3.52 cycles/word
+#      + Do tre 2 chu ky : 13 lan
+#      + Do tre 3 chu ky : 10 lan
+#      + Do tre 4 chu ky : 11 lan
+#      + Do tre 5 chu ky : 14 lan
+#      => Do tre RAM trung binh thuc nghiem: 3.54 cycles/word
 # -----------------------------------------------------------------------------------------------------
 #  [2] Khao sat anh huong khi thay doi cau hinh do tre RAM (tren cung Cache 2-Way):
-#      + Fast RAM (Co dinh 1 cyc/word)       : Stall = 123 cyc | AMAT = 3.05 | CPI = 1.72
-#      + Variable RAM (Bien thien 2..5 cyc)  : Stall = 244 cyc | AMAT = 5.07 | CPI = 2.19
-#      + Slow Variable RAM (Bien thien 4..7) : Stall = 331 cyc | AMAT = 6.52 | CPI = 2.53
+#      + Fast RAM (Co dinh 1 cyc/word)       : Stall = 141 cyc | AMAT = 3.35 | CPI = 2.22
+#      + Variable RAM (Bien thien 2..5 cyc)  : Stall = 263 cyc | AMAT = 5.38 | CPI = 3.06
+#      + Slow Variable RAM (Bien thien 4..7) : Stall = 349 cyc | AMAT = 6.82 | CPI = 3.66
 # =====================================================================================================
-#  TONG KET KIEM CHUNG DA2 : 17 PASSED, 0 FAILED
+#  TONG KET KIEM CHUNG DA2 : 20 PASSED, 0 FAILED
 # =====================================================================================================
 # ALL TESTS PASSED
-# ** Note: $finish    : tb/tb_riscv_cache_soc.v(828)
-#    Time: 186285 ns  Iteration: 1  Instance: /tb_riscv_cache_soc
+# ** Note: $finish    : tb/tb_riscv_cache_soc.v(1041)
+#    Time: 185575 ns  Iteration: 1  Instance: /tb_riscv_cache_soc

@@ -279,6 +279,157 @@ module tb_riscv_cache_soc;
     );
 
     // =========================================================================
+    // 1B. Khởi tạo 3 SoC chạy Benchmark 2 (sw/benchmark_seq.c -> sw/program_seq.hex):
+    //     Workload tuần tự & ít xung đột (Sequential / Low-Conflict)
+    // =========================================================================
+    wire        mem_req_s2w, mem_we_s2w, mem_ready_s2w, halted_s2w;
+    wire [3:0]  mem_wstrb_s2w;
+    wire [31:0] mem_addr_s2w, mem_wdata_s2w, mem_rdata_s2w;
+    wire [31:0] cyc_s2w, ins_s2w, acc_s2w, miss_s2w, stall_s2w, traf_s2w, coh_s2w;
+
+    riscv_cache_soc #(
+        .WAYS           (2),
+        .NUM_SETS       (64),
+        .IMEM_WORDS     (256),
+        .IMEM_INIT_FILE ("sw/program_seq.hex")
+    ) u_soc_seq_2w (
+        .clk               (clk),
+        .rst_n             (rst_n),
+        .cache_flush       (1'b0),
+        .cache_invalidate  (1'b0),
+        .maint_done        (),
+        .mem_req           (mem_req_s2w),
+        .mem_we            (mem_we_s2w),
+        .mem_wstrb         (mem_wstrb_s2w),
+        .mem_addr          (mem_addr_s2w),
+        .mem_wdata         (mem_wdata_s2w),
+        .mem_rdata         (mem_rdata_s2w),
+        .mem_ready         (mem_ready_s2w),
+        .cpu_halted        (halted_s2w),
+        .cpu_cycles        (cyc_s2w),
+        .cpu_instrs        (ins_s2w),
+        .cnt_accesses      (acc_s2w),
+        .cnt_misses        (miss_s2w),
+        .cnt_stall_cycles  (stall_s2w),
+        .cnt_mem_traffic   (traf_s2w),
+        .cnt_coherence_cyc (coh_s2w)
+    );
+
+    var_latency_mem #(
+        .BASE_DELAY (3'd2),
+        .VAR_ENABLE (1)
+    ) u_mem_seq_2w (
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .mem_req    (mem_req_s2w),
+        .mem_we     (mem_we_s2w),
+        .mem_wstrb  (mem_wstrb_s2w),
+        .mem_addr   (mem_addr_s2w),
+        .mem_wdata  (mem_wdata_s2w),
+        .mem_rdata  (mem_rdata_s2w),
+        .mem_ready  (mem_ready_s2w),
+        .addr_error ()
+    );
+
+    wire        mem_req_sdm, mem_we_sdm, mem_ready_sdm, halted_sdm;
+    wire [3:0]  mem_wstrb_sdm;
+    wire [31:0] mem_addr_sdm, mem_wdata_sdm, mem_rdata_sdm;
+    wire [31:0] cyc_sdm, ins_sdm, acc_sdm, miss_sdm, stall_sdm, traf_sdm, coh_sdm;
+
+    riscv_cache_soc #(
+        .WAYS           (1),
+        .NUM_SETS       (64),
+        .IMEM_WORDS     (256),
+        .IMEM_INIT_FILE ("sw/program_seq.hex")
+    ) u_soc_seq_dm (
+        .clk               (clk),
+        .rst_n             (rst_n),
+        .cache_flush       (1'b0),
+        .cache_invalidate  (1'b0),
+        .maint_done        (),
+        .mem_req           (mem_req_sdm),
+        .mem_we            (mem_we_sdm),
+        .mem_wstrb         (mem_wstrb_sdm),
+        .mem_addr          (mem_addr_sdm),
+        .mem_wdata         (mem_wdata_sdm),
+        .mem_rdata         (mem_rdata_sdm),
+        .mem_ready         (mem_ready_sdm),
+        .cpu_halted        (halted_sdm),
+        .cpu_cycles        (cyc_sdm),
+        .cpu_instrs        (ins_sdm),
+        .cnt_accesses      (acc_sdm),
+        .cnt_misses        (miss_sdm),
+        .cnt_stall_cycles  (stall_sdm),
+        .cnt_mem_traffic   (traf_sdm),
+        .cnt_coherence_cyc (coh_sdm)
+    );
+
+    var_latency_mem #(
+        .BASE_DELAY (3'd2),
+        .VAR_ENABLE (1)
+    ) u_mem_seq_dm (
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .mem_req    (mem_req_sdm),
+        .mem_we     (mem_we_sdm),
+        .mem_wstrb  (mem_wstrb_sdm),
+        .mem_addr   (mem_addr_sdm),
+        .mem_wdata  (mem_wdata_sdm),
+        .mem_rdata  (mem_rdata_sdm),
+        .mem_ready  (mem_ready_sdm),
+        .addr_error ()
+    );
+
+    wire        mem_req_sdm2k, mem_we_sdm2k, mem_ready_sdm2k, halted_sdm2k;
+    wire [3:0]  mem_wstrb_sdm2k;
+    wire [31:0] mem_addr_sdm2k, mem_wdata_sdm2k, mem_rdata_sdm2k;
+    wire [31:0] cyc_sdm2k, ins_sdm2k, acc_sdm2k, miss_sdm2k, stall_sdm2k, traf_sdm2k, coh_sdm2k;
+
+    riscv_cache_soc #(
+        .WAYS           (1),
+        .NUM_SETS       (128),
+        .IMEM_WORDS     (256),
+        .IMEM_INIT_FILE ("sw/program_seq.hex")
+    ) u_soc_seq_dm2k (
+        .clk               (clk),
+        .rst_n             (rst_n),
+        .cache_flush       (1'b0),
+        .cache_invalidate  (1'b0),
+        .maint_done        (),
+        .mem_req           (mem_req_sdm2k),
+        .mem_we            (mem_we_sdm2k),
+        .mem_wstrb         (mem_wstrb_sdm2k),
+        .mem_addr          (mem_addr_sdm2k),
+        .mem_wdata         (mem_wdata_sdm2k),
+        .mem_rdata         (mem_rdata_sdm2k),
+        .mem_ready         (mem_ready_sdm2k),
+        .cpu_halted        (halted_sdm2k),
+        .cpu_cycles        (cyc_sdm2k),
+        .cpu_instrs        (ins_sdm2k),
+        .cnt_accesses      (acc_sdm2k),
+        .cnt_misses        (miss_sdm2k),
+        .cnt_stall_cycles  (stall_sdm2k),
+        .cnt_mem_traffic   (traf_sdm2k),
+        .cnt_coherence_cyc (coh_sdm2k)
+    );
+
+    var_latency_mem #(
+        .BASE_DELAY (3'd2),
+        .VAR_ENABLE (1)
+    ) u_mem_seq_dm2k (
+        .clk        (clk),
+        .rst_n      (rst_n),
+        .mem_req    (mem_req_sdm2k),
+        .mem_we     (mem_we_sdm2k),
+        .mem_wstrb  (mem_wstrb_sdm2k),
+        .mem_addr   (mem_addr_sdm2k),
+        .mem_wdata  (mem_wdata_sdm2k),
+        .mem_rdata  (mem_rdata_sdm2k),
+        .mem_ready  (mem_ready_sdm2k),
+        .addr_error ()
+    );
+
+    // =========================================================================
     // 2. Khối DUT riêng cho Kiểm thử Corner Cases & Random Stress Test (600 txns)
     // =========================================================================
     reg         st_req, st_we;
@@ -525,6 +676,9 @@ module tb_riscv_cache_soc;
     real mr_2w, amat_2w, cpi_2w;
     real mr_dm, amat_dm, cpi_dm;
     real mr_dm2k, amat_dm2k, cpi_dm2k;
+    real mr_s2w, amat_s2w, cpi_s2w;
+    real mr_sdm, amat_sdm, cpi_sdm;
+    real mr_sdm2k, amat_sdm2k, cpi_sdm2k;
     real amat_fast, cpi_fast, amat_slow, cpi_slow;
     real avg_ram_lat;
 
@@ -564,21 +718,29 @@ module tb_riscv_cache_soc;
         $display(" PHAN 1: KIEM CHUNG CORE RISC-V PIPELINE 5 TANG + D-CACHE 2-WAY CHAY C (DA2)");
         $display("================================================================================");
 
-        // Chờ cả 5 SoC hoàn tất chương trình C và xả hết Write Buffer
-        wait (halted_2w && halted_dm && halted_dm2k && halted_fast && halted_slow);
-        wait (u_soc_2w.u_dcache.u_ctrl.state   == 3'd0 && !u_soc_2w.u_dcache.wb_valid);
-        wait (u_soc_dm.u_dcache.u_ctrl.state   == 3'd0 && !u_soc_dm.u_dcache.wb_valid);
-        wait (u_soc_dm2k.u_dcache.u_ctrl.state == 3'd0 && !u_soc_dm2k.u_dcache.wb_valid);
-        wait (u_soc_slow.u_dcache.u_ctrl.state == 3'd0 && !u_soc_slow.u_dcache.wb_valid);
+        // Chờ cả 8 SoC (Benchmark 1 + Benchmark 2) hoàn tất chương trình C và xả hết Write Buffer
+        wait (halted_2w && halted_dm && halted_dm2k && halted_fast && halted_slow &&
+              halted_s2w && halted_sdm && halted_sdm2k);
+        wait (u_soc_2w.u_dcache.u_ctrl.state       == 3'd0 && !u_soc_2w.u_dcache.wb_valid);
+        wait (u_soc_dm.u_dcache.u_ctrl.state       == 3'd0 && !u_soc_dm.u_dcache.wb_valid);
+        wait (u_soc_dm2k.u_dcache.u_ctrl.state     == 3'd0 && !u_soc_dm2k.u_dcache.wb_valid);
+        wait (u_soc_slow.u_dcache.u_ctrl.state     == 3'd0 && !u_soc_slow.u_dcache.wb_valid);
+        wait (u_soc_seq_2w.u_dcache.u_ctrl.state   == 3'd0 && !u_soc_seq_2w.u_dcache.wb_valid);
+        wait (u_soc_seq_dm.u_dcache.u_ctrl.state   == 3'd0 && !u_soc_seq_dm.u_dcache.wb_valid);
+        wait (u_soc_seq_dm2k.u_dcache.u_ctrl.state == 3'd0 && !u_soc_seq_dm2k.u_dcache.wb_valid);
         @(posedge clk);
 
-        $display("[INFO] Chuong trinh C (sw/benchmark_da2.c) da hoan tat (%0d lenh RV32I retired).", ins_2w);
+        $display("[INFO] Benchmark 1 (sw/benchmark_da2.c -> GCC ELF -> program.hex) hoan tat (%0d lenh RV32I retired).", ins_2w);
+        $display("[INFO] Benchmark 2 (sw/benchmark_seq.c -> GCC ELF -> program_seq.hex) hoan tat (%0d lenh RV32I retired).", ins_s2w);
 
-        // 1. Kết quả tính toán trên Core RISC-V
-        check_val(u_soc_2w.u_core.regfile[19], 32'h0000_0F78,
-                  "Test 1: Core RISC-V tinh sum = Sigma(A[i]+B[i]) = 3960");
-        check_val(u_soc_2w.u_core.regfile[21], 32'hBEEF_1234,
-                  "Test 2: Core RISC-V SH/SB/LW Byte-Strobe (0xBEEF1234) ");
+        // 1. Kết quả tính toán trên Core RISC-V (Benchmark 1: return sum trong a0 = regfile[10] và ADDR_RESULT[1] tại Set 48 Word 1)
+        check_val(u_soc_2w.u_core.regfile[10], 32'h0000_0F78,
+                  "Test 1: Core RISC-V (GCC ELF) return a0 = sum = 3960    ");
+        check_val({u_soc_2w.u_dcache.u_dp.gen_way[0].gen_word[1].bank_b3[48],
+                   u_soc_2w.u_dcache.u_dp.gen_way[0].gen_word[1].bank_b2[48],
+                   u_soc_2w.u_dcache.u_dp.gen_way[0].gen_word[1].bank_b1[48],
+                   u_soc_2w.u_dcache.u_dp.gen_way[0].gen_word[1].bank_b0[48]}, 32'hBEEF_1234,
+                  "Test 2: Core RISC-V SH/SB/LW RESULT[1] (0xBEEF1234)    ");
 
         // 2. Bằng chứng LRU Eviction CHIỀU 1 (lru_bit = 0 -> Trục xuất Way 0 chứa A xuống RAM tại 0x0100)
         check_val(u_mem_2w.ram[14'h0040], 32'd10,
@@ -615,10 +777,21 @@ module tb_riscv_cache_soc;
                   "Test 10: D-Cache RESULT[2] = status (0xCAFE0001)       ");
 
         // 5. Kiểm tra kết quả chương trình C trên SoC Direct-Mapped 1 KB (DM-1K) và 2 KB (DM-2K)
-        check_val(u_soc_dm.u_core.regfile[19], 32'h0000_0F78,
+        check_val(u_soc_dm.u_core.regfile[10], 32'h0000_0F78,
                   "Test 11a: SoC Direct-Mapped 1KB (DM-1K) tinh dung sum=3960");
-        check_val(u_soc_dm2k.u_core.regfile[19], 32'h0000_0F78,
+        check_val(u_soc_dm2k.u_core.regfile[10], 32'h0000_0F78,
                   "Test 11b: SoC Direct-Mapped 2KB (DM-2K) tinh dung sum=3960");
+
+        // 6. Kiểm tra kết quả Benchmark 2 (Sequential / Low-Conflict: sw/benchmark_seq.c)
+        check_val(u_soc_seq_2w.u_core.regfile[10], 32'h0000_05D8,
+                  "Test 11c [Seq Bench]: 2W-2K tinh dung sum_z = 1496 (0x5D8)");
+        check_val({u_soc_seq_2w.u_dcache.u_dp.gen_way[0].gen_word[1].bank_b3[48],
+                   u_soc_seq_2w.u_dcache.u_dp.gen_way[0].gen_word[1].bank_b2[48],
+                   u_soc_seq_2w.u_dcache.u_dp.gen_way[0].gen_word[1].bank_b1[48],
+                   u_soc_seq_2w.u_dcache.u_dp.gen_way[0].gen_word[1].bank_b0[48]}, 32'h0000_0550,
+                  "Test 11d [Seq Bench]: 2W-2K tinh dung filter_acc = 1360  ");
+        check_val(u_soc_seq_dm.u_core.regfile[10], 32'h0000_05D8,
+                  "Test 11e [Seq Bench]: DM-1K & DM-2K tinh dung sum_z = 1496");
 
         // =====================================================================
         // PHẦN 2: KIỂM THỬ CORNER CASES & RANDOM STRESS TEST (3 SEEDS x 200 TXNS)
@@ -763,6 +936,18 @@ module tb_riscv_cache_soc;
         amat_2w   = 1.0 + (1.0 * stall_2w / acc_2w);
         cpi_2w    = 1.0 * cyc_2w / ins_2w;
 
+        mr_sdm    = 100.0 * miss_sdm / acc_sdm;
+        amat_sdm  = 1.0 + (1.0 * stall_sdm / acc_sdm);
+        cpi_sdm   = 1.0 * cyc_sdm / ins_sdm;
+
+        mr_sdm2k  = 100.0 * miss_sdm2k / acc_sdm2k;
+        amat_sdm2k= 1.0 + (1.0 * stall_sdm2k / acc_sdm2k);
+        cpi_sdm2k = 1.0 * cyc_sdm2k / ins_sdm2k;
+
+        mr_s2w    = 100.0 * miss_s2w / acc_s2w;
+        amat_s2w  = 1.0 + (1.0 * stall_s2w / acc_s2w);
+        cpi_s2w   = 1.0 * cyc_s2w / ins_s2w;
+
         amat_fast = 1.0 + (1.0 * stall_fast / acc_fast);
         cpi_fast  = 1.0 * cyc_fast / ins_fast;
 
@@ -773,7 +958,7 @@ module tb_riscv_cache_soc;
                     ? (1.0 * u_mem_2w.total_lat_cycles / u_mem_2w.total_xfers) : 0.0;
 
         $display("=====================================================================================================");
-        $display(" PHAN 3: BANG DOI CHUNG CONG BANG DM-1K (1KB), DM-2K (2KB) VA 2W-2K (2KB) TREN CUNG CHUONG TRINH C");
+        $display(" PHAN 3A: DOI SANH TREN BENCHMARK 1 (sw/benchmark_da2.c - WORKLOAD XUNG DOT / THRASHING)");
         $display("=====================================================================================================");
         $display(" Chi tieu danh gia        | DM-1K (64S,1W,1KB) | DM-2K (128S,1W,2KB)| 2W-2K (64S,2W,2KB) | 2W-2K vs DM-2K");
         $display("--------------------------+--------------------+--------------------+--------------------+---------------");
@@ -799,6 +984,34 @@ module tb_riscv_cache_soc;
         $display(" Memory Traffic           | %8dW (%4dB) | %8dW (%4dB) | %8dW (%4dB) | -%0.1f %%",
                  traf_dm, traf_dm * 4, traf_dm2k, traf_dm2k * 4, traf_2w, traf_2w * 4,
                  100.0 * (traf_dm2k - traf_2w) / traf_dm2k);
+
+        $display("=====================================================================================================");
+        $display(" PHAN 3B: DOI SANH TREN BENCHMARK 2 (sw/benchmark_seq.c - WORKLOAD TUAN TU / IT XUNG DOT)");
+        $display("=====================================================================================================");
+        $display(" Chi tieu danh gia        | DM-1K (64S,1W,1KB) | DM-2K (128S,1W,2KB)| 2W-2K (64S,2W,2KB) | 2W-2K vs DM-2K");
+        $display("--------------------------+--------------------+--------------------+--------------------+---------------");
+        $display(" Tong so lenh RV32I       | %11d instrs | %11d instrs | %11d instrs |       -",
+                 ins_sdm, ins_sdm2k, ins_s2w);
+        $display(" Tong truy cap D-Cache    | %9d accesses | %9d accesses | %9d accesses |       -",
+                 acc_sdm, acc_sdm2k, acc_s2w);
+        $display(" So lan Cache Hit         | %13d hits | %13d hits | %13d hits | +%0d hits",
+                 acc_sdm - miss_sdm, acc_sdm2k - miss_sdm2k, acc_s2w - miss_s2w,
+                 (acc_s2w - miss_s2w) - (acc_sdm2k - miss_sdm2k));
+        $display(" So lan Cache Miss        | %11d misses | %11d misses | %11d misses | -%0.1f %%",
+                 miss_sdm, miss_sdm2k, miss_s2w, 100.0 * (miss_sdm2k - miss_s2w) / miss_sdm2k);
+        $display(" Miss Rate                | %16.2f %% | %16.2f %% | %16.2f %% | -%0.2f %%",
+                 mr_sdm, mr_sdm2k, mr_s2w, mr_sdm2k - mr_s2w);
+        $display(" Stall Cycles             | %11d cycles | %11d cycles | %11d cycles | -%0.1f %%",
+                 stall_sdm, stall_sdm2k, stall_s2w, 100.0 * (stall_sdm2k - stall_s2w) / stall_sdm2k);
+        $display(" AMAT (cycles/access)     | %18.2f | %18.2f | %18.2f | -%0.1f %% (%0.2fx)",
+                 amat_sdm, amat_sdm2k, amat_s2w, 100.0 * (amat_sdm2k - amat_s2w) / amat_sdm2k, amat_sdm2k / amat_s2w);
+        $display(" Tong chu ky CPU (Cycles) | %11d cycles | %11d cycles | %11d cycles | -%0.1f %%",
+                 cyc_sdm, cyc_sdm2k, cyc_s2w, 100.0 * (cyc_sdm2k - cyc_s2w) / cyc_sdm2k);
+        $display(" CPI (Cycles / Instr)     | %18.2f | %18.2f | %18.2f | -%0.1f %%",
+                 cpi_sdm, cpi_sdm2k, cpi_s2w, 100.0 * (cpi_sdm2k - cpi_s2w) / cpi_sdm2k);
+        $display(" Memory Traffic           | %8dW (%4dB) | %8dW (%4dB) | %8dW (%4dB) | -%0.1f %%",
+                 traf_sdm, traf_sdm * 4, traf_sdm2k, traf_sdm2k * 4, traf_s2w, traf_s2w * 4,
+                 100.0 * (traf_sdm2k - traf_s2w) / traf_sdm2k);
 
         $display("=====================================================================================================");
         $display(" PHAN 4: BANG CHUNG DO TRE RAM BIEN THIEN (LFSR) & KHAO SAT THAY DOI RAM LATENCY");
